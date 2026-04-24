@@ -1,0 +1,29 @@
+{
+  "name": "alicewiki",
+  "version": "1.0.0",
+  "description": "Terminal AI agent that fetches Wikipedia API",
+  "main": "src/index.ts",
+  "type": "module",
+  "bin": {
+    "alicewiki": "./bin/cli.js"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@langchain/anthropic": "^0.3.0",
+    "@langchain/core": "^1.1.40",
+    "@langchain/google-genai": "^0.1.0",
+    "@langchain/openai": "^0.4.0",
+    "dotenv": "^16.4.5",
+    "langchain": "^0.3.0",
+    "wikipedia": "^2.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.0"
+  }
+}
