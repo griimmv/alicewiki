@@ -14,7 +14,7 @@ const rl = readline.createInterface({
 const HELP_TEXT = `
 Commands:
   /help               Show this help message
-  /switch <provider>  Switch LLM provider (openai, anthropic, google)
+  /switch <provider>  Switch LLM provider (openai, /*opencode*/ anthropic, google)
   /quit               Exit the application
 
 Examples:
@@ -51,14 +51,14 @@ export async function handleInput(input: string): Promise<void> {
     const parts = trimmed.split(" ");
     if (parts.length < 2) {
       console.log("Usage: /switch <provider>");
-      console.log("Providers: openai, anthropic, google");
+      console.log("Providers: openai, /*opencode*/, anthropic, google");
       return;
     }
 
     const provider = parts[1].toLowerCase();
     if (!isValidProvider(provider)) {
       console.log(`Invalid provider: ${provider}`);
-      console.log("Valid providers: openai, anthropic, google");
+      console.log("Valid providers: openai, /*opencode*/, anthropic, google");
       return;
     }
 

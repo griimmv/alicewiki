@@ -11,7 +11,8 @@ export interface LLMConfig {
 }
 
 const DEFAULT_MODELS: Record<ProviderName, string> = {
-  opencode: "big-pickle",
+  openai: "gpt-5.4-nano",
+  //opencode: "big-pickle",
   anthropic: "claude-sonnet-4-20250514",
   google: "gemini-2.0-flash",
 };
@@ -21,7 +22,8 @@ export function createLLM(config: LLMConfig): any {
   const temperature = config.temperature ?? 0.7;
 
   switch (config.provider) {
-    case "opencode": {
+    /*
+      case "opencode": {
       const apiKey = process.env.OPENCODE_API_KEY;
       const apiBase = process.env.OPENCODE_API_BASE;
       if (!apiKey) {
@@ -31,14 +33,16 @@ export function createLLM(config: LLMConfig): any {
         model: modelName,
         temperature,
         apiKey,
+        baseURL: apiBase,
       });
     }
+    */
     case "anthropic": {
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
         throw new Error("ANTHROPIC_API_KEY is not set in .env");
       }
-      return new ChatAnthropic({
+      return new ChatAnthropic({p
         model: modelName,
         temperature,
         anthropicApiKey: apiKey,
@@ -62,12 +66,12 @@ export function createLLM(config: LLMConfig): any {
 
 export function getDefaultProvider(): ProviderName {
   const provider = process.env.DEFAULT_PROVIDER;
-  if (provider === "opencode" || provider === "anthropic" || provider === "google") {
+  if (provider === "openai" || /* provider === "opencode" */ || provider === "anthropic" || provider === "google") {
     return provider;
   }
-  return "opencode";
+  return "openai"
 }
 
 export function isValidProvider(name: string): name is ProviderName {
-  return name === "opencode" || name === "anthropic" || name === "google";
+  return name === "openai" || /* name === "opencode" */ || name === "anthropic" || name === "google";
 }
