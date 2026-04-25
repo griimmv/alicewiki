@@ -2,7 +2,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
-export type ProviderName = "opencode" | "anthropic" | "google";
+export type ProviderName = "openai" | /* "opencode" */ | "anthropic" | "google";
 
 export interface LLMConfig {
   provider: ProviderName;
@@ -11,7 +11,7 @@ export interface LLMConfig {
 }
 
 const DEFAULT_MODELS: Record<ProviderName, string> = {
-  openai: "gpt-5.4-nano",
+  openai: "gpt-5.4-mini",
   //opencode: "big-pickle",
   anthropic: "claude-sonnet-4-20250514",
   google: "gemini-2.0-flash",
@@ -21,6 +21,7 @@ export function createLLM(config: LLMConfig): any {
   const modelName = config.modelName || DEFAULT_MODELS[config.provider];
   const temperature = config.temperature ?? 0.7;
 
+  // Get API key from each provider
   switch (config.provider) {
     /*
       case "opencode": {
@@ -36,7 +37,19 @@ export function createLLM(config: LLMConfig): any {
         baseURL: apiBase,
       });
     }
-    */
+    */ 
+    case "openai": {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        throw new Error("OPENAI_API_KEY is not set in .env");
+      }
+      return new ChatOpenAI({
+        model: modelName,
+        temperature,
+        apiKey,
+        baseURL: apiBase,
+      });
+    }
     case "anthropic": {
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
