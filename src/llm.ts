@@ -47,7 +47,6 @@ export function createLLM(config: LLMConfig): any {
         model: modelName,
         temperature,
         apiKey,
-        baseURL: apiBase,
       });
     }
     case "anthropic": {
@@ -55,7 +54,7 @@ export function createLLM(config: LLMConfig): any {
       if (!apiKey) {
         throw new Error("ANTHROPIC_API_KEY is not set in .env");
       }
-      return new ChatAnthropic({p
+      return new ChatAnthropic({
         model: modelName,
         temperature,
         anthropicApiKey: apiKey,
@@ -79,12 +78,12 @@ export function createLLM(config: LLMConfig): any {
 
 export function getDefaultProvider(): ProviderName {
   const provider = process.env.DEFAULT_PROVIDER;
-  if (provider === "openai" || /* provider === "opencode" */ || provider === "anthropic" || provider === "google") {
+  if (provider === "openai" || /* provider === "opencode"  || */ provider === "anthropic" || provider === "google") {
     return provider;
   }
   return "openai"
 }
 
 export function isValidProvider(name: string): name is ProviderName {
-  return name === "openai" || /* name === "opencode" */ || name === "anthropic" || name === "google";
+  return name === "openai" || /* name === "opencode"  || */ name === "anthropic" || name === "google";
 }
