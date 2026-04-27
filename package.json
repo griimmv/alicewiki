@@ -1,6 +1,6 @@
 {
   "name": "alicewiki",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Terminal AI agent that fetches Wikipedia API",
   "main": "src/index.ts",
   "type": "module",
