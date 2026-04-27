@@ -19,7 +19,7 @@ const DEFAULT_MODELS: Record<ProviderName, string> = {
 
 export function createLLM(config: LLMConfig): any {
   const modelName = config.modelName || DEFAULT_MODELS[config.provider];
-  const temperature = config.temperature ?? 0.7;
+  const temperature = config.temperature ?? 0.0;
 
   // Get API key from each provider
   switch (config.provider) {
