@@ -2,7 +2,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
-export type ProviderName = "openai" | /* "opencode" */ | "anthropic" | "google";
+export type ProviderName = "openai" /* |  "opencode" */ | "anthropic" | "google";
 
 export interface LLMConfig {
   provider: ProviderName;

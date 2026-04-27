@@ -1,4 +1,4 @@
-import { wikipediaTool } from "./tools/wikipedia.js";
+import { wikipediaTool } from "./tools/wikipedia.ts";
 
 export function createAgent(llm: any) {
   return {

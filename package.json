@@ -5,7 +5,8 @@
   "main": "src/index.ts",
   "type": "module",
   "bin": {
-    "alicewiki": "./bin/cli.js"
+    "alicewiki": "./bin/cli.js",
+    "aw": "./bin/cli.js"
   },
   "scripts": {
     "start": "tsx src/index.ts",
