@@ -1,6 +1,6 @@
 import * as readline from "readline";
-import { createAgent, runAgent } from "./agent.js";
-import { createLLM, getDefaultProvider, isValidProvider } from "./llm.js";
+import { createAgent, runAgent } from "./agent.ts";
+import { createLLM, getDefaultProvider, isValidProvider } from "./llm.ts";
 let currentProvider = getDefaultProvider();
 let currentLLM = createLLM({ provider: currentProvider });
 let agent = createAgent(currentLLM);
@@ -11,7 +11,7 @@ const rl = readline.createInterface({
 const HELP_TEXT = `
 Commands:
   /help               Show this help message
-  /switch <provider>  Switch LLM provider (openai, anthropic, google)
+  /switch <provider>  Switch LLM provider (openai, /*opencode*/ anthropic, google)
   /quit               Exit the application
 
 Examples:
@@ -43,13 +43,13 @@ export async function handleInput(input) {
         const parts = trimmed.split(" ");
         if (parts.length < 2) {
             console.log("Usage: /switch <provider>");
-            console.log("Providers: openai, anthropic, google");
+            console.log("Providers: openai, /*opencode*/, anthropic, google");
             return;
         }
         const provider = parts[1].toLowerCase();
         if (!isValidProvider(provider)) {
             console.log(`Invalid provider: ${provider}`);
-            console.log("Valid providers: openai, anthropic, google");
+            console.log("Valid providers: openai, /*opencode*/, anthropic, google");
             return;
         }
         try {
@@ -63,10 +63,10 @@ export async function handleInput(input) {
         }
         return;
     }
-    console.log("\nThinking...\n");
+    console.log("\nThinking...");
     try {
         const response = await runAgent(agent, trimmed);
-        console.log("Answer:");
+        console.log("\nAnswer:");
         console.log("-".repeat(40));
         console.log(response);
         console.log("-".repeat(40));

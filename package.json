@@ -10,7 +10,8 @@
   },
   "scripts": {
     "start": "tsx src/index.ts",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "build": "rm -rf dist && tsc"
   },
   "dependencies": {
     "@langchain/anthropic": "^0.3.0",
