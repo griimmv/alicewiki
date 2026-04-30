@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { startCLI, handleInput } from "./cli.ts";
+import { startCLI, handleInput } from "./cli.js";
 
 async function main() {
   const args = process.argv.slice(2);

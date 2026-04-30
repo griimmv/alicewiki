@@ -1,11 +1,9 @@
 import wiki from "wikipedia";
-import { Tool } from "langchain/tools";
+import { tool } from "@langchain/core/tools";
+import * as z from "zod";
 
-export const wikipediaTool = new Tool({
-  name: "wikipedia",
-  description:
-    "A Wikipedia search tool. Use this when the user asks about factual information, people, places, history, or any topic that can be found on Wikipedia. Input should be a search query or topic name.",
-  func: async (input: string): Promise<string> => {
+export const wikipediaTool = tool(
+  async (input: string): Promise<string> => {
     try {
       const summary = await wiki.summary(input);
 
@@ -24,6 +22,12 @@ export const wikipediaTool = new Tool({
       return "Unknown error occurred while fetching Wikipedia article";
     }
   },
-});
+  {
+    name: "wikipedia",
+    description:
+      "A Wikipedia search tool. Use this when the user asks about factual information, people, places, history, or any topic that can be found on Wikipedia. Input should be a search query or topic name.",
+    schema: z.string(),
+  }
+);
 
 export const tools = [wikipediaTool];
