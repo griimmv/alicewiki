@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import "dotenv/config";
 import { startCLI, handleInput } from "./cli.js";
 
