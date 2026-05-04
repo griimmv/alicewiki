@@ -1,6 +1,7 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import "dotenv/config";
 
 export type ProviderName = "openai" /* |  "opencode" */ | "anthropic" | "google";
 
