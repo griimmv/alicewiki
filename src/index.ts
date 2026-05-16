@@ -1,13 +1,12 @@
 #!/usr/bin/env node
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import dotenv from "dotenv";
-import os from "os";
-import path from "path";
 
-const homeDir = os.homedir();
-const nodeVersion = process.version;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const envPath = homeDir + "/.nvm/versions/node/" + nodeVersion + "/lib/node_modules/alicewiki/.env";
-
+const envPath = path.join(__dirname, "..", ".env");
 dotenv.config({ path: envPath });
 
 import { startCLI, handleInput } from "./cli.js";
