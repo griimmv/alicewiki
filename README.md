@@ -48,9 +48,3 @@ DEFAULT_PROVIDER=openai  # openai, anthropic, google, opencode
 - npm
 - An API key for OpenAI, Anthropic, Google, or OpenCode
 
-## Troubleshooting
-
-Find where global packages are installed:
-```bash
-npm config get prefix
-```
