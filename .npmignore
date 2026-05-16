@@ -1,0 +1,9 @@
+.git
+.gitignore
+.env
+.env.example
+node_modules
+*.ts
+*.map
+tsconfig.json
+README.md
