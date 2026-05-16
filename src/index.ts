@@ -6,7 +6,7 @@ import path from "path";
 const homeDir = os.homedir();
 const nodeVersion = process.version;
 
-const envPath = path.join(homeDir, ".nvm", "versions", "node", nodeVersion, "lib", "node_modules", "alicewiki", ".env");
+const envPath = homeDir + "/.nvm/versions/node/" + nodeVersion + "/lib/node_modules/alicewiki/.env";
 
 dotenv.config({ path: envPath });
 
