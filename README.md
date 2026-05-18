@@ -1,3 +1,4 @@
+![Alice in Wonderland: I'm Late & Down the Rabbit Hole](https://i.makeagif.com/media/2-10-2024/z2uHAc.gif)
 # AliceWiki
 
 A terminal AI agent that fetches information from Wikipedia API using LangChain.
