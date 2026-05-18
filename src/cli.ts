@@ -14,11 +14,11 @@ const rl = readline.createInterface({
 const HELP_TEXT = `
 Commands:
   /help               Show this help message
-  /switch <provider>  Switch LLM provider (openai, /*opencode*/ anthropic, google)
+  /switch <provider>  Switch LLM provider (openai, anthropic, google)
   /quit               Exit the application
 
 Examples:
-  Who is Batman?
+  Who is Mary Sue?
   Tell me about Python programming language
   What is the history of France?
 `;
@@ -89,7 +89,7 @@ export async function handleInput(input: string): Promise<void> {
 export function startCLI() {
   printWelcome();
 
-  rl.setPrompt("You: ");
+  rl.setPrompt("Type a question: ");
 
   rl.prompt();
 
@@ -99,7 +99,7 @@ export function startCLI() {
   });
 
   rl.on("close", () => {
-    console.log("\nGoodbye!");
+    console.log("\nCtrl+c pressed. Goodbye!");
     process.exit(0);
   });
 }
