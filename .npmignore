@@ -6,4 +6,3 @@ node_modules
 *.ts
 *.map
 tsconfig.json
-README.md

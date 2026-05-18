@@ -8,16 +8,6 @@ A terminal AI agent that fetches information from Wikipedia API using LangChain.
 npm install -g alicewiki
 ```
 
-## Usage
-
-```bash
-# Interactive mode
-aw
-
-# One-liner mode
-aw "Who is Batman?"
-```
-
 ## Configuration
 
 Create a `.env` file in your project directory:
@@ -30,11 +20,21 @@ ANTHROPIC_API_KEY=your_key
 # or
 GOOGLE_API_KEY=your_key
 
-# Optional
-DEFAULT_PROVIDER=openai  # openai, anthropic, google, opencode
+# Add default provider
+DEFAULT_PROVIDER=openai  # openai, anthropic, google
 ```
 
-> **Note:** Place your `.env` file in the directory returned by `npm config get prefix` and then go to /lib/node_modules/alicewiki/
+> **Note:** Place your `.env` file in the directory by doing `npm config get prefix` and then go to lib/node_modules/alicewiki/ and place your .env there
+
+## Usage
+
+```bash
+# Interactive mode
+aw
+
+# One-liner mode
+aw "Who is Mary Sue?"
+```
 
 ## Commands (Interactive Mode)
 
