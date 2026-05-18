@@ -33,7 +33,7 @@ DEFAULT_PROVIDER=openai  # openai, anthropic, google
 aw
 
 # One-liner mode
-aw "Who is Mary Sue?"
+aw who is mary sue?
 ```
 
 ## Commands (Interactive Mode)
@@ -46,5 +46,5 @@ aw "Who is Mary Sue?"
 
 - Node.js 18+
 - npm
-- An API key for OpenAI, Anthropic, Google, or OpenCode
+- An API key for OpenAI, Anthropic, or Google
 
