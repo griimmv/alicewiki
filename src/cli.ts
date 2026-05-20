@@ -24,12 +24,19 @@ Examples:
 `;
 
 export function printWelcome() {
-  console.log("=".repeat(50));
-  console.log("  AliceWiki - Terminal AI Agent");
+  console.log();
+  console.log(" █████╗ ██╗     ██╗ ██████╗███████╗██╗    ██╗██╗██╗  ██╗██╗");
+  console.log("██╔══██╗██║     ██║██╔════╝██╔════╝██║    ██║██║██║ ██╔╝██║");
+  console.log("███████║██║     ██║██║     █████╗  ██║ █╗ ██║██║█████╔╝ ██║");
+  console.log("██╔══██║██║     ██║██║     ██╔══╝  ██║███╗██║██║██╔═██╗ ██║");
+  console.log("██║  ██║███████╗██║╚██████╗███████╗╚███╔███╔╝██║██║  ██╗██║");
+  console.log("╚═╝  ╚═╝╚══════╝╚═╝ ╚═════╝╚══════╝ ╚══╝╚══╝ ╚═╝╚═╝  ╚═╝╚═╝");
+  console.log();
   console.log("  Powered by Wikipedia + LangChain");
-  console.log("=".repeat(50));
   console.log(`\nCurrent provider: ${currentProvider}`);
+  console.log();
   console.log(HELP_TEXT);
+  console.log();
 }
 
 export async function handleInput(input: string): Promise<void> {
