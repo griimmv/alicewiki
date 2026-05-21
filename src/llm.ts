@@ -25,6 +25,9 @@ const DEFAULT_MODELS: Record<ProviderName, string> = {
   google: "gemini-2.0-flash",
 };
 
+// JSON mode is handled via .withStructuredOutput() in agent.ts
+// Anthropic: uses prompt-based JSON (less reliable)
+
 export function createLLM(config: LLMConfig): any {
   const modelName = config.modelName || DEFAULT_MODELS[config.provider];
   const temperature = config.temperature ?? 0.0;

@@ -2,24 +2,28 @@ import wiki from "wikipedia";
 import { tool } from "@langchain/core/tools";
 import * as z from "zod";
 
+export interface WikiResult {
+  title: string;
+  url: string;
+  extract: string;
+  thumbnail?: string;
+}
+
 export const wikipediaTool = tool(
   async (input: string): Promise<string> => {
     try {
       const summary = await wiki.summary(input);
 
-      let result = `Title: ${summary.title}\n\n`;
-      result += `Summary: ${summary.extract}\n`;
+      const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(summary.title.replace(/ /g, '_'))}`;
 
-      if (summary.thumbnail?.source) {
-        result += `\nImage: ${summary.thumbnail.source}`;
-      }
-
-      return result;
+      return JSON.stringify({
+        title: summary.title,
+        url,
+        extract: summary.extract,
+        thumbnail: summary.thumbnail?.source
+      });
     } catch (error) {
-      if (error instanceof Error) {
-        return `Wikipedia error: ${error.message}`;
-      }
-      return "Unknown error occurred while fetching Wikipedia article";
+      return JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" });
     }
   },
   {

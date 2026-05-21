@@ -1,4 +1,22 @@
-import { wikipediaTool } from "./tools/wikipedia.js";
+import { wikipediaTool, WikiResult } from "./tools/wikipedia.js";
+import * as z from "zod";
+
+const ResponseSchema = z.object({
+  summary: z.string().describe("2-3 paragraph synthesis of the information"),
+  quotes: z.array(
+    z.object({
+      text: z.string().describe("a key quote or passage from the Wikipedia text"),
+      source: z.string().describe("the Wikipedia page title"),
+      url: z.string().describe("the Wikipedia page URL"),
+    })
+  ).describe("list of direct quotes from the Wikipedia article"),
+  sources: z.array(
+    z.object({
+      title: z.string().describe("the Wikipedia page title"),
+      url: z.string().describe("the Wikipedia page URL"),
+    })
+  ).describe("list of Wikipedia sources"),
+});
 
 export function createAgent(llm: any) {
   return {
@@ -27,14 +45,45 @@ export async function runAgent(agent: any, input: string): Promise<string> {
     if (mightNeedWikipedia(input)) {
       try {
         const topic = extractWikiTopic(input);
-        const wikiResult = await wikipediaTool.func(topic);
+        const rawWikiResult = await wikipediaTool.func(topic);
+        const rawResult = typeof rawWikiResult === 'string' ? rawWikiResult : String(rawWikiResult);
         
+        let wikiData: WikiResult;
+        try {
+          wikiData = JSON.parse(rawResult);
+        } catch {
+          return "Error: Failed to parse Wikipedia response";
+        }
+
+        if ("error" in wikiData) {
+          return `Wikipedia error: ${wikiData.error}`;
+        }
+
         const messages = [
-          { role: "user", content: `User asked: "${input}"\n\nWikipedia information:\n${wikiResult}\n\nPlease provide a helpful answer based on this information.` }
+          { 
+            role: "user", 
+            content: `User asked: "${input}"
+
+Wikipedia article about "${wikiData.title}":
+${wikiData.extract}
+Source: ${wikiData.url}
+
+Respond ONLY with valid JSON, no other text:
+{
+  "summary": "2-3 paragraph synthesis of the information",
+  "quotes": [
+    {"text": "a key quote or passage from the Wikipedia text", "source": "${wikiData.title}", "url": "${wikiData.url}"}
+  ],
+  "sources": [
+    {"title": "${wikiData.title}", "url": "${wikiData.url}"}
+  ]
+}`
+          }
         ];
         
-        const response = await agent.llm.invoke(messages);
-        return response.content || String(response);
+        const structuredLlm = agent.llm.withStructuredOutput(ResponseSchema);
+        const response = await structuredLlm.invoke(messages);
+        return JSON.stringify(response);
       } catch (wikiError) {
         const response = await agent.llm.invoke([{ role: "user", content: input }]);
         return response.content || String(response);
