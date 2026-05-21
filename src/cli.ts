@@ -2,6 +2,62 @@ import * as readline from "readline";
 import { createAgent, runAgent } from "./agent.js";
 import { createLLM, getDefaultProvider, isValidProvider, ProviderName } from "./llm.js";
 
+interface Quote {
+  text: string;
+  source: string;
+  url: string;
+}
+
+interface Source {
+  title: string;
+  url: string;
+}
+
+interface ParsedResponse {
+  summary: string;
+  quotes: Quote[];
+  sources: Source[];
+}
+
+function parseJSONResponse(response: string): ParsedResponse | null {
+  try {
+    let jsonStr = response.trim();
+    const match = response.match(/```(?:json)?\n([\s\S]*?)\n```/);
+    if (match) jsonStr = match[1];
+    return JSON.parse(jsonStr);
+  } catch {
+    return null;
+  }
+}
+
+function displayFormattedOutput(data: ParsedResponse) {
+  console.log("\n" + "═".repeat(50));
+  console.log("  SUMMARY");
+  console.log("═".repeat(50));
+  console.log(data.summary);
+
+  console.log("\n" + "═".repeat(50));
+  console.log("  DIRECT QUOTES");
+  console.log("═".repeat(50));
+  if (data.quotes.length === 0) {
+    console.log("(No direct quotes extracted)");
+  } else {
+    data.quotes.forEach((q, i) => {
+      console.log(`\n[${i + 1}] "${q.text}"`);
+      console.log(`     — ${q.source}`);
+      console.log(`     ${q.url}`);
+    });
+  }
+
+  console.log("\n" + "═".repeat(50));
+  console.log("  SOURCES");
+  console.log("═".repeat(50));
+  data.sources.forEach((s, i) => {
+    console.log(`[${i + 1}] ${s.title}`);
+    console.log(`     ${s.url}`);
+  });
+}
+
 let currentProvider: ProviderName = getDefaultProvider();
 let currentLLM = createLLM({ provider: currentProvider });
 let agent = createAgent(currentLLM);
@@ -84,10 +140,17 @@ export async function handleInput(input: string): Promise<void> {
 
   try {
     const response = await runAgent(agent, trimmed);
-    console.log("\nAnswer:");
-    console.log("-".repeat(40));
-    console.log(response);
-    console.log("-".repeat(40));
+    const parsed = parseJSONResponse(response);
+
+    if (parsed) {
+      displayFormattedOutput(parsed);
+    } else {
+      console.error("\nError: Failed to parse response as JSON");
+      console.log("\nRaw response:");
+      console.log("-".repeat(40));
+      console.log(response);
+      console.log("-".repeat(40));
+    }
   } catch (error) {
     console.log(`Error: ${(error as Error).message}`);
   }
