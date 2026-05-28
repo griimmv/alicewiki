@@ -1,22 +1,33 @@
 import { wikipediaTool, WikiResult } from "./tools/wikipedia.js";
-import * as z from "zod";
 
-const ResponseSchema = z.object({
-  summary: z.string().describe("2-3 paragraph synthesis of the information"),
-  quotes: z.array(
-    z.object({
-      text: z.string().describe("a key quote or passage from the Wikipedia text"),
-      source: z.string().describe("the Wikipedia page title"),
-      url: z.string().describe("the Wikipedia page URL"),
-    })
-  ).describe("list of direct quotes from the Wikipedia article"),
-  sources: z.array(
-    z.object({
-      title: z.string().describe("the Wikipedia page title"),
-      url: z.string().describe("the Wikipedia page URL"),
-    })
-  ).describe("list of Wikipedia sources"),
-});
+function parseJSONFromText(text: string): Record<string, unknown> | null {
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  const str = match ? match[1] : text.trim();
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null;
+  }
+}
+
+function buildJsonPrompt(input: string, wikiData: WikiResult): string {
+  return `User asked: "${input}"
+
+Wikipedia article about "${wikiData.title}":
+${wikiData.extract}
+Source: ${wikiData.url}
+
+Respond ONLY with valid JSON matching this schema, no other text:
+{
+  "summary": "2-3 paragraph synthesis of the information",
+  "quotes": [
+    {"text": "a key quote or passage from the Wikipedia text", "source": "${wikiData.title}", "url": "${wikiData.url}"}
+  ],
+  "sources": [
+    {"title": "${wikiData.title}", "url": "${wikiData.url}"}
+  ]
+}`;
+}
 
 export function createAgent(llm: any) {
   return {
@@ -36,7 +47,10 @@ function mightNeedWikipedia(query: string): boolean {
 }
 
 function extractWikiTopic(query: string): string {
-  return query.replace(/^(who is|what is|tell me about|explain|describe)/i, '').trim() || query;
+  return query
+    .replace(/^(who is|what is|tell me about|explain|describe)\s+/i, '')
+    .replace(/^(the|a|an)\s+/i, '')
+    .trim() || query;
 }
 
 export async function runAgent(agent: any, input: string): Promise<string> {
@@ -59,31 +73,12 @@ export async function runAgent(agent: any, input: string): Promise<string> {
           return `Wikipedia error: ${wikiData.error}`;
         }
 
-        const messages = [
-          { 
-            role: "user", 
-            content: `User asked: "${input}"
-
-Wikipedia article about "${wikiData.title}":
-${wikiData.extract}
-Source: ${wikiData.url}
-
-Respond ONLY with valid JSON, no other text:
-{
-  "summary": "2-3 paragraph synthesis of the information",
-  "quotes": [
-    {"text": "a key quote or passage from the Wikipedia text", "source": "${wikiData.title}", "url": "${wikiData.url}"}
-  ],
-  "sources": [
-    {"title": "${wikiData.title}", "url": "${wikiData.url}"}
-  ]
-}`
-          }
-        ];
-        
-        const structuredLlm = agent.llm.withStructuredOutput(ResponseSchema);
-        const response = await structuredLlm.invoke(messages);
-        return JSON.stringify(response);
+        const messages = [{ role: "user", content: buildJsonPrompt(input, wikiData) }];
+        const result = await agent.llm.invoke(messages);
+        const content = result.content || String(result);
+        const parsed = parseJSONFromText(content);
+        if (parsed) return JSON.stringify(parsed);
+        return content;
       } catch (wikiError) {
         const response = await agent.llm.invoke([{ role: "user", content: input }]);
         return response.content || String(response);

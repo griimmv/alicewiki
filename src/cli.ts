@@ -145,11 +145,8 @@ export async function handleInput(input: string): Promise<void> {
     if (parsed) {
       displayFormattedOutput(parsed);
     } else {
-      console.error("\nError: Failed to parse response as JSON");
-      console.log("\nRaw response:");
-      console.log("-".repeat(40));
+      console.log();
       console.log(response);
-      console.log("-".repeat(40));
     }
   } catch (error) {
     console.log(`Error: ${(error as Error).message}`);
