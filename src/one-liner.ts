@@ -28,6 +28,9 @@ export async function runOneLiner(query: string): Promise<void> {
     return;
   }
 
+  if (result.notification) {
+    console.log(`\n${result.notification}`);
+  }
   console.log(`\n\n${result.title}\n`);
   console.log(result.extract);
   console.log(`\n\n${result.url}\n`);

@@ -30,10 +30,10 @@ DEFAULT_PROVIDER=openai  # openai, anthropic, google
 ## Usage
 
 ```bash
-# Interactive mode
+# Interactive/Agentic mode (need llm api key)(still in development)
 aw
 
-# One-liner mode
+# One-liner mode (doesn't need llm api key)
 aw who is mary sue?
 ```
 
