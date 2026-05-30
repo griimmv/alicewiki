@@ -58,9 +58,22 @@ function displayFormattedOutput(data: ParsedResponse) {
   });
 }
 
-let currentProvider: ProviderName = getDefaultProvider();
-let currentLLM = createLLM({ provider: currentProvider });
-let agent = createAgent(currentLLM);
+let currentProvider: ProviderName;
+let currentLLM: ReturnType<typeof createLLM>;
+let _agent: ReturnType<typeof createAgent> | null = null;
+
+/**
+ * Getter for lazy load for one liner mode to function properly without an api key.
+ * The LLM is only initialized when interactive mode actually needs it.
+ */
+function getAgent() {
+  if (!_agent) {
+    currentProvider = getDefaultProvider();
+    currentLLM = createLLM({ provider: currentProvider });
+    _agent = createAgent(currentLLM);
+  }
+  return _agent;
+}
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -128,7 +141,7 @@ export async function handleInput(input: string): Promise<void> {
     try {
       currentProvider = provider;
       currentLLM = createLLM({ provider: currentProvider });
-      agent = createAgent(currentLLM);
+      _agent = createAgent(currentLLM);
       console.log(`Switched to ${provider}`);
     } catch (error) {
       console.log(`Error: ${(error as Error).message}`);
@@ -139,7 +152,7 @@ export async function handleInput(input: string): Promise<void> {
   console.log("\nThinking...");
 
   try {
-    const response = await runAgent(agent, trimmed);
+    const response = await runAgent(getAgent(), trimmed);
     const parsed = parseJSONResponse(response);
 
     if (parsed) {
