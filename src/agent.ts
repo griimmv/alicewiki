@@ -46,7 +46,7 @@ function mightNeedWikipedia(query: string): boolean {
   return WIKI_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-function extractWikiTopic(query: string): string {
+export function extractWikiTopic(query: string): string {
   return query
     .replace(/^(who is|what is|tell me about|explain|describe)\s+/i, '')
     .replace(/^(the|a|an)\s+/i, '')
