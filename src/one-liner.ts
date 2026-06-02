@@ -20,7 +20,7 @@ function parseWikipediaSummary(response: string): WikiResult | null {
 
 export async function runOneLiner(query: string): Promise<void> {
   const topic = extractWikiTopic(query);
-  const raw = await wikipediaTool.func(topic);
+  const raw = await wikipediaTool.func({ query: topic });
   const result = parseWikipediaSummary(raw as string);
 
   if (!result) {
