@@ -2,6 +2,8 @@ import * as readline from "readline";
 import { createAgent, runAgent } from "./agent.js";
 import { createLLM, getDefaultProvider, isValidProvider, ProviderName } from "./llm.js";
 
+
+
 interface Quote {
   text: string;
   source: string;
@@ -19,6 +21,7 @@ interface ParsedResponse {
   sources: Source[];
 }
 
+// json parser 
 function parseJSONResponse(response: string): ParsedResponse | null {
   try {
     let jsonStr = response.trim();
@@ -58,7 +61,7 @@ function displayFormattedOutput(data: ParsedResponse) {
   });
 }
 
-let currentProvider: ProviderName;
+let currentProvider: ProviderName = getDefaultProvider();
 let currentLLM: ReturnType<typeof createLLM>;
 let _agent: ReturnType<typeof createAgent> | null = null;
 let conversationHistory: any[] = [];
