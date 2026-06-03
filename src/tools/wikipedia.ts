@@ -1,5 +1,6 @@
 import wiki from "wikipedia";
 import { tool } from "@langchain/core/tools";
+import { z } from "zod";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -61,16 +62,9 @@ export const wikipediaTool = tool(
     name: "wikipedia",
     description:
       "A Wikipedia search tool. Use this when the user asks about factual information, people, places, history, or any topic that can be found on Wikipedia. Input should be a search query or topic name.",
-    schema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "The topic to search for on Wikipedia",
-        },
-      },
-      required: ["query"],
-    },
+    schema: z.object({
+      query: z.string().describe("The topic to search for on Wikipedia"),
+    }),
   }
 );
 
