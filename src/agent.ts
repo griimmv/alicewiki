@@ -1,49 +1,16 @@
-import { wikipediaTool, WikiResult } from "./tools/wikipedia.js";
+import { wikipediaTool } from "./tools/wikipedia.js";
 
-function parseJSONFromText(text: string): Record<string, unknown> | null {
-  const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  const str = match ? match[1] : text.trim();
-  try {
-    return JSON.parse(str);
-  } catch {
-    return null;
-  }
-}
-
-function buildJsonPrompt(input: string, wikiData: WikiResult): string {
-  return `User asked: "${input}"
-
-Wikipedia article about "${wikiData.title}":
-${wikiData.extract}
-Source: ${wikiData.url}
+const SYSTEM_PROMPT = `You are a helpful assistant with access to Wikipedia. When the user asks about factual topics (people, places, history, concepts), use the wikipedia tool to look up the topic. For general chat or simple queries, answer directly.
 
 Respond ONLY with valid JSON matching this schema, no other text:
 {
   "summary": "2-3 paragraph synthesis of the information",
-  "quotes": [
-    {"text": "a key quote or passage from the Wikipedia text", "source": "${wikiData.title}", "url": "${wikiData.url}"}
-  ],
-  "sources": [
-    {"title": "${wikiData.title}", "url": "${wikiData.url}"}
-  ]
+  "quotes": [{"text": "a key quote", "source": "Article title", "url": "https://..."}],
+  "sources": [{"title": "Article title", "url": "https://..."}]
 }`;
-}
 
 export function createAgent(llm: any) {
-  return {
-    llm,
-    tools: [wikipediaTool],
-  };
-}
-
-const WIKI_KEYWORDS = [
-  'who', 'what', 'where', 'when', 'why', 'how', 'explain', 'describe',
-  'information', 'about', 'definition', 'history', 'person', 'place'
-];
-
-function mightNeedWikipedia(query: string): boolean {
-  const lower = query.toLowerCase();
-  return WIKI_KEYWORDS.some(kw => lower.includes(kw));
+  return { llm, tools: [wikipediaTool] };
 }
 
 export function extractWikiTopic(query: string): string {
@@ -53,45 +20,61 @@ export function extractWikiTopic(query: string): string {
     .trim() || query;
 }
 
-export async function runAgent(agent: any, input: string): Promise<string> {
-  try {
-    // Detect if might need Wikipedia
-    if (mightNeedWikipedia(input)) {
-      try {
-        const topic = extractWikiTopic(input);
-        const rawWikiResult = await wikipediaTool.func(topic);
-        const rawResult = typeof rawWikiResult === 'string' ? rawWikiResult : String(rawWikiResult);
-        
-        let wikiData: WikiResult;
-        try {
-          wikiData = JSON.parse(rawResult);
-        } catch {
-          return "Error: Failed to parse Wikipedia response";
-        }
+export async function runAgent(
+  agent: any,
+  input: string,
+  history: any[] = []
+): Promise<string> {
+  const messages: any[] = [...history, { role: "user", content: input }];
+  const maxLoops = 5;
 
-        if ("error" in wikiData) {
-          return `Wikipedia error: ${wikiData.error}`;
-        }
+  // infinite loop safeguard for llm to prevent token wasted on unnecessary tasks
+  for (let i = 0; i < maxLoops; i++) {
+    const result = await agent.llm.invoke(
+      [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+      { tools: agent.tools }
+    );
 
-        const messages = [{ role: "user", content: buildJsonPrompt(input, wikiData) }];
-        const result = await agent.llm.invoke(messages);
-        const content = result.content || String(result);
-        const parsed = parseJSONFromText(content);
-        if (parsed) return JSON.stringify(parsed);
-        return content;
-      } catch (wikiError) {
-        const response = await agent.llm.invoke([{ role: "user", content: input }]);
-        return response.content || String(response);
+    // checks if result.content is an array or not and converts it into string
+    const content =
+      typeof result.content === "string"
+        ? result.content
+        : Array.isArray(result.content)
+          ? result.content
+              .map((c: any) => (typeof c === "string" ? c : c?.text ?? ""))
+              .join("")
+          : String(result.content ?? result);
+
+    if (result.tool_calls?.length > 0) {
+      messages.push({ role: "assistant", content: "", tool_calls: result.tool_calls });
+      for (const tc of result.tool_calls) {
+        const tool = agent.tools.find((t: any) => t.name === tc.name);
+        if (tool) {
+          const output = await tool.func(tc.args);
+          messages.push({ role: "tool", content: output, tool_call_id: tc.id });
+        }
       }
+      continue;
     }
-    
-    const messages = [{ role: "user", content: input }];
-    const response = await agent.llm.invoke(messages);
-    return response.content || String(response);
-  } catch (error) {
-    if (error instanceof Error) {
-      return `Error: ${error.message}`;
-    }
-    return "Unknown error occurred";
+
+    const parsed = parseJSONFromText(content);
+    if (parsed) return JSON.stringify(parsed);
+    return content;
+  }
+
+  return JSON.stringify({
+    summary: "I couldn't complete this request within the allowed steps.",
+    quotes: [],
+    sources: []
+  });
+}
+
+function parseJSONFromText(text: string): Record<string, unknown> | null {
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  const str = match ? match[1] : text.trim();
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null;
   }
 }
