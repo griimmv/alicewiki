@@ -47,7 +47,7 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
 ### `wikipediaTool` (`tools/wikipedia.ts`)
 
 - **Name**: `wikipedia`
-- **Input**: Free-text topic (e.g. `"Python programming language"`, `"Marie Curie"`)
+- **Input**: Object with `query` property (e.g. `{ query: "Python programming language" }`, `{ query: "Marie Curie" }`)
 - **Output**: JSON with `title`, `url`, `extract`, `fullContent`, `thumbnail`, and optional `notification`
 - **Implementation**:
   - Uses CJS `require("wikipedia")` via `createRequire()` for compatibility.
@@ -64,4 +64,3 @@ Used in one-liner mode. Strips leading keywords (`who is`, `what is`, `tell me a
 
 - **Lightweight**: minimal dependencies (`langchain`, `@langchain/*`, `zod`, `dotenv`, `wikipedia`).
 - **Resource-efficient**: no browser automation, no heavy frameworks. Single-threaded Node.js process.
-- **Modest RAM**: runs comfortably in <50 MB.

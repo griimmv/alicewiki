@@ -46,8 +46,3 @@ aw who is mary sue?
 - `/switch <provider>` - Switch LLM provider
 - `/quit` - Exit
 
-## Requirements
-
-- Node.js 18+
-- An API key for OpenAI, Anthropic, or Google
-

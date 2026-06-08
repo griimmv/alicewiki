@@ -1,4 +1,3 @@
-import wiki from "wikipedia";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { createRequire } from "node:module";
@@ -26,7 +25,8 @@ async function fetchPage(input: string): Promise<WikiResult> {
 
   const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(pageSummary.title.replace(/ /g, '_'))}`;
   const truncated = content.length > MAX_CONTENT_CHARS
-    ? content.slice(0, MAX_CONTENT_CHARS) + "\n\n[...content truncated]"
+  const suffix = "\n\n[...content truncated]";
+    ? content.slice(0, MAX_CONTENT_CHARS - suffix.length) + suffix
     : content;
 
   return {
@@ -48,13 +48,13 @@ export const wikipediaTool = tool(
       try {
         const searchResults = await wikiCjs.search(topic, { limit: 1 });
         if (searchResults.results.length === 0) {
-          return JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" });
+          return JSON.stringify({ title: "", url: "", extract: "", fullContent: "", thumbnail: "", notification: `Search failed: ${error instanceof Error ? error.message : "Unknown error"}` });
         }
         const result = await fetchPage(searchResults.results[0].title);
         result.notification = "  (No title matched the query, using fuzzy finder option that might be inaccurate)";
         return JSON.stringify(result);
       } catch (searchError) {
-        return JSON.stringify({ error: searchError instanceof Error ? searchError.message : "Unknown error" });
+        return JSON.stringify({ title: "", url: "", extract: "", fullContent: "", thumbnail: "", notification: `Fallback: ${searchError instanceof Error ? searchError.message : "Unknown error"}` });
       }
     }
   },

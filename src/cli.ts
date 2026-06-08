@@ -127,7 +127,7 @@ export async function handleInput(input: string): Promise<void> {
     return;
   }
 
-  if (trimmed.startsWith("/switch ")) {
+  if (trimmed.startsWith("/switch ") || trimmed === "/switch") {
     const parts = trimmed.split(" ");
     if (parts.length < 2) {
       console.log("Usage: /switch <provider>");
