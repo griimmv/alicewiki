@@ -28,13 +28,22 @@ export async function runAgent(
   const messages: any[] = [...history, { role: "user", content: input }];
   const maxLoops = 5;
 
+  // infinite loop safeguard for llm to prevent token wasted on unnecessary tasks
   for (let i = 0; i < maxLoops; i++) {
     const result = await agent.llm.invoke(
       [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
       { tools: agent.tools }
     );
 
-    const content = result.content || String(result);
+    // checks if result.content is an array or not and converts it into string
+    const content =
+      typeof result.content === "string"
+        ? result.content
+        : Array.isArray(result.content)
+          ? result.content
+              .map((c: any) => (typeof c === "string" ? c : c?.text ?? ""))
+              .join("")
+          : String(result.content ?? result);
 
     if (result.tool_calls?.length > 0) {
       messages.push({ role: "assistant", content: "", tool_calls: result.tool_calls });
