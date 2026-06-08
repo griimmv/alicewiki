@@ -3,7 +3,7 @@ import { extractWikiTopic } from "./agent.js";
 
 /**
  * I know there is already a parsing function in cli.ts (parseJSONResponse),
- * but it's not compatible with summary() output, so I make a new one to parse it.
+ * but it's not compatible with summary() output from wikipedia, so I make a new one to parse it.
  */
 function parseWikipediaSummary(response: string): WikiResult | null {
   try {
@@ -20,7 +20,7 @@ function parseWikipediaSummary(response: string): WikiResult | null {
 
 export async function runOneLiner(query: string): Promise<void> {
   const topic = extractWikiTopic(query);
-  const raw = await wikipediaTool.func(topic);
+  const raw = await wikipediaTool.func({ query: topic });
   const result = parseWikipediaSummary(raw as string);
 
   if (!result) {

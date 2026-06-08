@@ -21,8 +21,8 @@ export interface LLMConfig {
 const DEFAULT_MODELS: Record<ProviderName, string> = {
   openai: "gpt-5.4-mini",
   //opencode: "big-pickle",
-  anthropic: "claude-sonnet-4-20250514",
-  google: "gemini-2.0-flash",
+  anthropic: "claude-haiku-4-5",
+  google: "gemini-3.5-flash",
 };
 
 // JSON mode is handled via .withStructuredOutput() in agent.ts

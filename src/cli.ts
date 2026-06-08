@@ -2,6 +2,8 @@ import * as readline from "readline";
 import { createAgent, runAgent } from "./agent.js";
 import { createLLM, getDefaultProvider, isValidProvider, ProviderName } from "./llm.js";
 
+
+
 interface Quote {
   text: string;
   source: string;
@@ -19,6 +21,7 @@ interface ParsedResponse {
   sources: Source[];
 }
 
+// json parser 
 function parseJSONResponse(response: string): ParsedResponse | null {
   try {
     let jsonStr = response.trim();
@@ -58,9 +61,10 @@ function displayFormattedOutput(data: ParsedResponse) {
   });
 }
 
-let currentProvider: ProviderName;
+let currentProvider: ProviderName = getDefaultProvider();
 let currentLLM: ReturnType<typeof createLLM>;
 let _agent: ReturnType<typeof createAgent> | null = null;
+let conversationHistory: any[] = [];
 
 /**
  * Getter for lazy load for one liner mode to function properly without an api key.
@@ -123,7 +127,7 @@ export async function handleInput(input: string): Promise<void> {
     return;
   }
 
-  if (trimmed.startsWith("/switch ")) {
+  if (trimmed.startsWith("/switch ") || trimmed === "/switch") {
     const parts = trimmed.split(" ");
     if (parts.length < 2) {
       console.log("Usage: /switch <provider>");
@@ -142,6 +146,7 @@ export async function handleInput(input: string): Promise<void> {
       currentProvider = provider;
       currentLLM = createLLM({ provider: currentProvider });
       _agent = createAgent(currentLLM);
+      conversationHistory = [];
       console.log(`Switched to ${provider}`);
     } catch (error) {
       console.log(`Error: ${(error as Error).message}`);
@@ -152,7 +157,7 @@ export async function handleInput(input: string): Promise<void> {
   console.log("\nThinking...");
 
   try {
-    const response = await runAgent(getAgent(), trimmed);
+    const response = await runAgent(getAgent(), trimmed, conversationHistory);
     const parsed = parseJSONResponse(response);
 
     if (parsed) {
@@ -160,6 +165,13 @@ export async function handleInput(input: string): Promise<void> {
     } else {
       console.log();
       console.log(response);
+    }
+
+    conversationHistory.push({ role: "user", content: trimmed });
+    conversationHistory.push({ role: "assistant", content: response });
+
+    if (conversationHistory.length > 20) {
+      conversationHistory = conversationHistory.slice(-20);
     }
   } catch (error) {
     console.log(`Error: ${(error as Error).message}`);
