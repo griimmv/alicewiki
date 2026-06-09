@@ -1,14 +1,6 @@
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-import dotenv from "dotenv";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const envPath = path.join(__dirname, "..", ".env");
-dotenv.config({ path: envPath });
 
 export type ProviderName = "openai" /* |  "opencode" */ | "anthropic" | "google";
 
