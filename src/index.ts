@@ -1,6 +1,6 @@
-#!/usr/bin/env node
-import { startCLI, handleInput } from "./cli.js";
-import { runOneLiner } from "./one-liner.js";
+#!/usr/bin/env bun
+import { startCLI, handleInput } from "./cli.ts";
+import { runOneLiner } from "./one-liner.ts";
 
 async function main() {
   const args = process.argv.slice(2);

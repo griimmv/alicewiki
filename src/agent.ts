@@ -1,4 +1,4 @@
-import { wikipediaTool } from "./tools/wikipedia.js";
+import { wikipediaTool } from "./tools/wikipedia.ts";
 
 const SYSTEM_PROMPT = `You are a helpful assistant with access to Wikipedia. When the user asks about factual topics (people, places, history, concepts), use the wikipedia tool to look up the topic. For general chat or simple queries, answer directly.
 
