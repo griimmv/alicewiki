@@ -47,10 +47,10 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
 ### `wikipediaTool` (`tools/wikipedia.ts`)
 
 - **Name**: `wikipedia`
-- **Input**: Object with `query` property (e.g. `{ query: "Python programming language" }`, `{ query: "Marie Curie" }`)
+- **Input**: Object with `query` property (e.g. `{ query: "Python programming language" }`, `{ query: "Mary Sue" }`)
 - **Output**: JSON with `title`, `url`, `extract`, `fullContent`, `thumbnail`, and optional `notification`
 - **Implementation**:
-  - Uses CJS `require("wikipedia")` via `createRequire()` for compatibility.
+  - Uses ESM import.
   - Fetches both `page.summary()` and `page.content()` in parallel.
   - Full content truncated at 8000 chars with `[...content truncated]` suffix.
   - Falls back to fuzzy search (`wiki.search()`) when direct page lookup fails; appends a `notification` field when using a fuzzy match.

@@ -1,6 +1,7 @@
 import * as readline from "readline";
-import { createAgent, runAgent } from "./agent.js";
-import { createLLM, getDefaultProvider, isValidProvider, ProviderName } from "./llm.js";
+import { createAgent, runAgent } from "./agent.ts";
+import { createLLM, getDefaultProvider, isValidProvider } from "./llm.ts";
+import type { ProviderName } from "./llm.ts";
 
 
 
