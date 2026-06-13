@@ -1,5 +1,6 @@
-import { wikipediaTool, WikiResult } from "./tools/wikipedia.js";
-import { extractWikiTopic } from "./agent.js";
+import { wikipediaTool } from "./tools/wikipedia.ts";
+import type { WikiResult } from "./tools/wikipedia.ts";
+import { extractWikiTopic } from "./agent.ts";
 
 /**
  * I know there is already a parsing function in cli.ts (parseJSONResponse),

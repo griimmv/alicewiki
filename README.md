@@ -5,18 +5,18 @@ A terminal AI chatbot that fetches information from Wikipedia API using LangChai
 
 ## Requirements
 
-- Node.js 18+
+- [Bun](https://bun.sh) 1.2+
 - An API key for OpenAI, Anthropic, or Google
 
 ## Installation
 
 ```bash
-npm install -g alicewiki
+bun install -g alicewiki
 ```
 
 ## Configuration
 
-Create a `.env` file in your project directory:
+Bun automatically loads `.env` from the current directory. Create a `.env` file:
 
 ```bash
 # Required - at least one API key
@@ -27,8 +27,6 @@ GOOGLE_API_KEY=your_key
 # Add default provider
 DEFAULT_PROVIDER=openai  # openai, anthropic, google
 ```
-
-> **Note:** Place your `.env` file in the directory by doing `npm config get prefix` and then go to lib/node_modules/alicewiki/ and place your .env there
 
 ## Usage
 

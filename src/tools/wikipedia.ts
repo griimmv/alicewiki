@@ -1,9 +1,6 @@
+import wiki from "wikipedia";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
-const wikiCjs = require("wikipedia");
 
 const MAX_CONTENT_CHARS = 8000;
 
@@ -17,15 +14,15 @@ export interface WikiResult {
 }
 
 async function fetchPage(input: string): Promise<WikiResult> {
-  const page = await wikiCjs.page(input, { preload: true });
+  const page = await wiki.page(input, { preload: true });
   const [pageSummary, content] = await Promise.all([
     page.summary(),
     page.content(),
   ]);
 
   const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(pageSummary.title.replace(/ /g, '_'))}`;
-  const truncated = content.length > MAX_CONTENT_CHARS
   const suffix = "\n\n[...content truncated]";
+  const truncated = content.length > MAX_CONTENT_CHARS
     ? content.slice(0, MAX_CONTENT_CHARS - suffix.length) + suffix
     : content;
 
@@ -46,7 +43,7 @@ export const wikipediaTool = tool(
       return JSON.stringify(result);
     } catch (error) {
       try {
-        const searchResults = await wikiCjs.search(topic, { limit: 1 });
+        const searchResults = await wiki.search(topic, { limit: 1 });
         if (searchResults.results.length === 0) {
           return JSON.stringify({ title: "", url: "", extract: "", fullContent: "", thumbnail: "", notification: `Search failed: ${error instanceof Error ? error.message : "Unknown error"}` });
         }
