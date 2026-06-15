@@ -8,7 +8,9 @@ import {
   TextAttributes,
   t,
 } from "@opentui/core";
+import type { KeyEvent } from "@opentui/core";
 import { createAgent, runAgent } from "./agent.ts";
+import { Sidebar } from "./sidebar.ts";
 import { createLLM, getDefaultProvider, isValidProvider } from "./llm.ts";
 import type { ProviderName } from "./llm.ts";
 
@@ -54,6 +56,12 @@ function parseJSONResponse(response: string): ParsedResponse | null {
   }
 }
 
+const PAGGA_ART = [
+  "░█▀█░█░░░▀█▀░█▀▀░█▀▀░█░█░▀█▀░█░█░▀█▀",
+  "░█▀█░█░░░░█░░█░░░█▀▀░█▄█░░█░░█▀▄░░█░",
+  "░▀░▀░▀▀▀░▀▀▀░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀▀▀",
+];
+
 const HELP_TEXT = `
 Commands:
   /help                 Show this help message
@@ -74,7 +82,12 @@ export async function startTUI() {
   const isDark = theme !== "light";
   const colors = getThemeColors(isDark);
 
+  const sidebar = new Sidebar(renderer, colors, isDark);
+  let queryCount = 0;
+  let articleFetchCount = 0;
+
   let currentProvider: ProviderName = getDefaultProvider();
+  sidebar.setProvider(currentProvider);
   let currentLLM = createLLM({ provider: currentProvider });
   let agent = createAgent(currentLLM);
   let conversationHistory: any[] = [];
@@ -106,39 +119,56 @@ export async function startTUI() {
   });
 
   const inputBar = new BoxRenderable(renderer, {
-    borderStyle: "single",
+    borderStyle: "heavy",
     borderColor: colors.border,
     paddingLeft: 1,
     paddingRight: 1,
     width: "100%",
     flexDirection: "column",
+    flexShrink: 0,
   });
   inputBar.add(inputField);
   inputBar.add(statusText);
 
   const headerText = new TextRenderable(renderer, {
-    content: t`AliceWiki  —  ${currentProvider}`,
+    content: t`${PAGGA_ART[0]}\n${PAGGA_ART[1]}  —  ${currentProvider}\n${PAGGA_ART[2]}`,
     fg: colors.accent,
     attributes: TextAttributes.BOLD,
   });
 
   const headerBar = new BoxRenderable(renderer, {
-    borderStyle: "single",
+    borderStyle: "heavy",
     borderColor: colors.border,
     paddingLeft: 1,
     width: "100%",
+    flexShrink: 0,
   });
   headerBar.add(headerText);
 
-  const layout = new BoxRenderable(renderer, {
+  const mainColumn = new BoxRenderable(renderer, {
     flexDirection: "column",
+    flexGrow: 1,
     width: "100%",
     height: "100%",
   });
-  layout.add(headerBar);
-  layout.add(messagesContainer);
-  layout.add(inputBar);
-  renderer.root.add(layout);
+  mainColumn.add(headerBar);
+  mainColumn.add(messagesContainer);
+  mainColumn.add(inputBar);
+
+  const rootLayout = new BoxRenderable(renderer, {
+    flexDirection: "row",
+    width: "100%",
+    height: "100%",
+  });
+  rootLayout.add(sidebar.getContainer());
+  rootLayout.add(mainColumn);
+  renderer.root.add(rootLayout);
+
+  renderer.keyInput.on("keypress", (key: KeyEvent) => {
+    if (key.ctrl && key.name === "b") {
+      sidebar.toggle();
+    }
+  });
 
   inputField.focus();
 
@@ -160,9 +190,8 @@ export async function startTUI() {
     });
     turn.add(new TextRenderable(renderer, {
       id: "welcome-text",
-      content: "  AliceWiki  —  Powered by Wikipedia + LangChain",
-      fg: colors.accent,
-      attributes: TextAttributes.BOLD | TextAttributes.UNDERLINE,
+      content: "  Welcome to AliceWiki! A place where you can go deep dive into a topic using Wikipedia API as the source. \n  Start asking question on the input box below \n\n  Have fun deep diving! or should i call it.. Down the rabbit hole!",
+      fg: colors.text,
     }));
     addTurn(turn);
   }
@@ -235,7 +264,8 @@ export async function startTUI() {
         }));
         addTurn(turn);
         statusText.content = t`${currentProvider}  ·  Ctrl+C to quit`;
-        headerText.content = t`AliceWiki  —  ${currentProvider}`;
+        headerText.content = t`${PAGGA_ART[0]}\n${PAGGA_ART[1]}  —  ${currentProvider}\n${PAGGA_ART[2]}\n`;
+        sidebar.setProvider(currentProvider);
       } catch (err) {
         const turn = new BoxRenderable(renderer, {
           flexDirection: "column",
@@ -260,7 +290,7 @@ export async function startTUI() {
     });
 
     const userBox = new BoxRenderable(renderer, {
-      borderStyle: "single",
+      borderStyle: "rounded",
       borderColor: colors.border,
       padding: 1,
       width: "100%",
@@ -283,7 +313,7 @@ export async function startTUI() {
       const parsed = parseJSONResponse(response);
       if (parsed) {
         const summaryBox = new BoxRenderable(renderer, {
-          borderStyle: "single",
+          borderStyle: "rounded",
           borderColor: colors.accent,
           padding: 1,
           width: "100%",
@@ -356,6 +386,15 @@ export async function startTUI() {
       conversationHistory.push({ role: "assistant", content: response });
       if (conversationHistory.length > 20) {
         conversationHistory = conversationHistory.slice(-20);
+      }
+
+      queryCount++;
+      sidebar.updateStats(queryCount, articleFetchCount);
+      if (parsed?.sources?.length > 0) {
+        const firstSource = parsed.sources[0];
+        sidebar.setCurrentArticle(firstSource.title);
+        sidebar.addHistoryEntry(firstSource.title);
+        articleFetchCount++;
       }
     } catch (err) {
       const errorBox = new BoxRenderable(renderer, {
