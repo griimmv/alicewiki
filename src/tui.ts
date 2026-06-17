@@ -56,6 +56,21 @@ function parseJSONResponse(response: string): ParsedResponse | null {
   }
 }
 
+async function typeText(
+  renderer: any,
+  tr: TextRenderable,
+  text: string,
+  speedMs: number = 15,
+): Promise<void> {
+  if (!text) return;
+  renderer.requestLive();
+  for (let i = 1; i <= text.length; i++) {
+    tr.content = text.slice(0, i);
+    await new Promise((r) => setTimeout(r, speedMs));
+  }
+  renderer.dropLive();
+}
+
 const PAGGA_ART = [
   "░█▀█░█░░░▀█▀░█▀▀░█▀▀░█░█░▀█▀░█░█░▀█▀",
   "░█▀█░█░░░░█░░█░░░█▀▀░█▄█░░█░░█▀▄░░█░",
@@ -445,6 +460,7 @@ export async function startTUI() {
       const response = await runAgent(agent, trimmed, conversationHistory);
       const parsed = parseJSONResponse(response);
       if (parsed) {
+        // ── Summary ──
         const summaryBox = new BoxRenderable(renderer, {
           borderStyle: "rounded",
           borderColor: colors.accent,
@@ -457,12 +473,15 @@ export async function startTUI() {
           fg: colors.accent,
           attributes: TextAttributes.BOLD,
         }));
-        summaryBox.add(new TextRenderable(renderer, {
-          content: `  ${parsed.summary}`,
+        const summaryText = new TextRenderable(renderer, {
+          content: "",
           fg: colors.text,
-        }));
+        });
+        summaryBox.add(summaryText);
         turn.add(summaryBox);
 
+        // ── Quotes (boxes built now, animated later) ──
+        const quoteTexts: TextRenderable[] = [];
         if (parsed.quotes.length > 0) {
           const quotesBox = new BoxRenderable(renderer, {
             borderStyle: "single",
@@ -477,15 +496,18 @@ export async function startTUI() {
             attributes: TextAttributes.BOLD,
           }));
           for (let i = 0; i < parsed.quotes.length; i++) {
-            const q = parsed.quotes[i];
-            quotesBox.add(new TextRenderable(renderer, {
-              content: `  [${i + 1}] "${q.text}"\n       \u2014 ${q.source}\n       ${q.url}`,
+            const qt = new TextRenderable(renderer, {
+              content: "",
               fg: colors.text,
-            }));
+            });
+            quotesBox.add(qt);
+            quoteTexts.push(qt);
           }
           turn.add(quotesBox);
         }
 
+        // ── Sources (boxes built now, animated later) ──
+        const sourceTexts: TextRenderable[] = [];
         if (parsed.sources.length > 0) {
           const sourcesBox = new BoxRenderable(renderer, {
             borderStyle: "single",
@@ -500,19 +522,51 @@ export async function startTUI() {
             attributes: TextAttributes.BOLD,
           }));
           for (let i = 0; i < parsed.sources.length; i++) {
-            const s = parsed.sources[i];
-            sourcesBox.add(new TextRenderable(renderer, {
-              content: `  [${i + 1}] ${s.title}\n       ${s.url}`,
+            const st = new TextRenderable(renderer, {
+              content: "",
               fg: colors.text,
-            }));
+            });
+            sourcesBox.add(st);
+            sourceTexts.push(st);
           }
           turn.add(sourcesBox);
         }
+
+        // ── Typewriter animation ──
+        await typeText(renderer, summaryText, `  ${parsed.summary}`, 15);
+
+        if (parsed.quotes.length > 0) {
+          await new Promise((r) => setTimeout(r, 200));
+          for (let i = 0; i < parsed.quotes.length; i++) {
+            const q = parsed.quotes[i];
+            await typeText(
+              renderer,
+              quoteTexts[i],
+              `  [${i + 1}] "${q.text}"\n       \u2014 ${q.source}\n       ${q.url}`,
+              10,
+            );
+          }
+        }
+
+        if (parsed.sources.length > 0) {
+          await new Promise((r) => setTimeout(r, 200));
+          for (let i = 0; i < parsed.sources.length; i++) {
+            const s = parsed.sources[i];
+            await typeText(
+              renderer,
+              sourceTexts[i],
+              `  [${i + 1}] ${s.title}\n       ${s.url}`,
+              10,
+            );
+          }
+        }
       } else {
-        turn.add(new TextRenderable(renderer, {
-          content: `  ${response}`,
+        const rawText = new TextRenderable(renderer, {
+          content: "",
           fg: colors.text,
-        }));
+        });
+        turn.add(rawText);
+        await typeText(renderer, rawText, `  ${response}`, 15);
       }
 
       conversationHistory.push({ role: "user", content: trimmed });
