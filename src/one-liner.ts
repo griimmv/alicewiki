@@ -3,7 +3,7 @@ import type { WikiResult } from "./tools/wikipedia.ts";
 import { extractWikiTopic } from "./agent.ts";
 
 /**
- * I know there is already a parsing function in cli.ts (parseJSONResponse),
+ * I know there is already a parsing function in tui.ts (parseJSONResponse),
  * but it's not compatible with summary() output from wikipedia, so I make a new one to parse it.
  */
 function parseWikipediaSummary(response: string): WikiResult | null {
