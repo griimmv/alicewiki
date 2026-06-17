@@ -18,8 +18,9 @@ interface ThemeColors {
   text: string;
   muted: string;
   accent: string;
-  success: string;
   border: string;
+  source: string;
+  quote: string;
 }
 
 interface Quote {
@@ -41,8 +42,8 @@ interface ParsedResponse {
 
 function getThemeColors(isDark: boolean): ThemeColors {
   return isDark
-    ? { text: "#c0caf5", muted: "#565f89", accent: "#7aa2f7", success: "#9ece6a", border: "#3b4261" }
-    : { text: "#1a1b26", muted: "#9aa0b0", accent: "#2e4a8a", success: "#4d7c2a", border: "#c8ccd4" };
+    ? { text: "#c0caf5", muted: "#565f89", accent: "#7aa2f7", border: "#3b4261", source: "#ffffff", quote: "#ffd700" }
+    : { text: "#1a1b26", muted: "#9aa0b0", accent: "#2e4a8a", border: "#c8ccd4", source: "#1a1a2e", quote: "#ffd700" };
 }
 
 function parseJSONResponse(response: string): ParsedResponse | null {
@@ -430,7 +431,6 @@ export async function startTUI() {
     }
 
     isProcessing = true;
-    statusText.content = t`Thinking...`;
 
     const turn = new BoxRenderable(renderer, {
       flexDirection: "column",
@@ -440,6 +440,7 @@ export async function startTUI() {
     const userBox = new BoxRenderable(renderer, {
       borderStyle: "rounded",
       borderColor: colors.border,
+      titleColor: colors.source,
       padding: 1,
       width: "100%",
       flexDirection: "column",
@@ -455,6 +456,15 @@ export async function startTUI() {
     }));
     turn.add(userBox);
     addTurn(turn);
+
+    const spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+    let spinnerIdx = 0;
+    // Initial frame — prevents blank gap before first interval tick
+    userBox.bottomTitle = ` ${spinnerFrames[0]} Thinking `;
+    const spinnerInterval = setInterval(() => {
+      spinnerIdx = (spinnerIdx + 1) % spinnerFrames.length;
+      userBox.bottomTitle = ` ${spinnerFrames[spinnerIdx]} Thinking `;
+    }, 80);
 
     try {
       const response = await runAgent(agent, trimmed, conversationHistory);
@@ -485,14 +495,14 @@ export async function startTUI() {
         if (parsed.quotes.length > 0) {
           const quotesBox = new BoxRenderable(renderer, {
             borderStyle: "single",
-            borderColor: colors.success,
+            borderColor: colors.quote,
             padding: 1,
             width: "100%",
             flexDirection: "column",
           });
           quotesBox.add(new TextRenderable(renderer, {
             content: "  DIRECT QUOTES",
-            fg: colors.success,
+            fg: colors.quote,
             attributes: TextAttributes.BOLD,
           }));
           for (let i = 0; i < parsed.quotes.length; i++) {
@@ -511,14 +521,14 @@ export async function startTUI() {
         if (parsed.sources.length > 0) {
           const sourcesBox = new BoxRenderable(renderer, {
             borderStyle: "single",
-            borderColor: colors.border,
+            borderColor: colors.source,
             padding: 1,
             width: "100%",
             flexDirection: "column",
           });
           sourcesBox.add(new TextRenderable(renderer, {
             content: "  SOURCES",
-            fg: colors.muted,
+            fg: colors.source,
             attributes: TextAttributes.BOLD,
           }));
           for (let i = 0; i < parsed.sources.length; i++) {
@@ -603,7 +613,8 @@ export async function startTUI() {
       turn.add(errorBox);
     }
 
-    statusText.content = t`${currentProvider}  ·  Ctrl+C to quit`;
+    clearInterval(spinnerInterval);
+    userBox.bottomTitle = "";
     isProcessing = false;
   });
 }
