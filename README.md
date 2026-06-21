@@ -1,4 +1,4 @@
-![Alice in Wonderland: I'm Late & Down the Rabbit Hole](assets/Alice.gif)
+![AliceWiki Banner](assets/alicewiki5.png)
 # AliceWiki
 
 A terminal AI chatbot that fetches information from Wikipedia API using LangChain.
