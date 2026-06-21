@@ -10,7 +10,7 @@ export interface LLMConfig {
   temperature?: number;
 }
 
-const DEFAULT_MODELS: Record<ProviderName, string> = {
+export const DEFAULT_MODELS: Record<ProviderName, string> = {
   openai: "gpt-5.4-mini",
   //opencode: "big-pickle",
   anthropic: "claude-haiku-4-5",

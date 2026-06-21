@@ -11,8 +11,67 @@ import {
 } from "@opentui/core";
 import type { KeyEvent } from "@opentui/core";
 import { createAgent, runAgent } from "./agent.ts";
-import { createLLM, getDefaultProvider, isValidProvider } from "./llm.ts";
+import { createLLM, getDefaultProvider, isValidProvider, DEFAULT_MODELS } from "./llm.ts";
 import type { ProviderName } from "./llm.ts";
+
+// ── File map ──────────────────────────────────────────────
+// 64-72   ThemeColors interface
+// 73-78   Quote interface
+// 79-82   Source interface
+// 84-88   ParsedResponse interface
+// 90-94   getThemeColors()
+// 96-105  parseJSONResponse()
+// 107-120 typeText()
+// 122-126 PAGGA_ART (ASCII logo)
+// 128-133 HELP_TEXT
+// 135     MAX_TURNS
+// 137-673 startTUI()
+//   138-142   createCliRenderer
+//   144-146   theme detection
+//   UI Components:
+//   148-164   Header (headerText, headerBar)
+//   166-297   Sidebar class (inline)
+//             173 articleCache: Set<string> (dedup)
+//             205-206 queriesText, articlesText (split from single statsText)
+//             213-221  statsBox wrapper (flexShrink: 0)
+//             229     kbHint helper
+//             233-241 kbBox wrapper (flexShrink: 0) with 4 keybind hints
+//             238     Ctrl+B to hide sidebar
+//             239     Alt+D to focus input bar
+//             240     Ctrl+C to quit
+//             241     Ctrl+click to open links
+//             258-259 spacer×2 before FETCHED ARTICLES
+//             283-284 updateStats() sets two separate texts
+//             288-289 addHistoryEntry() deduplicates via articleCache
+//   299-310   Sidebar init + state vars
+//   312-322   messagesContainer
+//   323-348   Input Bar (inputField, statusText, inputBar)
+//   349-367   UI Layout:
+//           rootLayout (row)
+//             sidebar
+//             mainColumn (column)
+//               headerBar
+//               messages
+//               inputBar
+//   369-375   Alt+D (focus input) + Ctrl+B (toggle sidebar) keybindings
+//   377       inputField.focus()
+//   379-386   addTurn() — capped at MAX_TURNS
+//   388-401   Welcome message turn
+//   403-672   Input handler (ENTER)
+//     409-412   /quit
+//     414-435   /help
+//     437-485   /switch <provider>
+//     487-668   Main query handler
+//       489-512   User query box
+//       514-521   Spinner
+//       523-649   Agent run + response rendering
+//         527-545   Summary box
+//         547-571   Quotes boxes
+//         573-597   Sources boxes
+//         599-634   Typewriter animation (summary · quotes · sources · raw fallback)
+//         636-649   Conversation history + sidebar update
+//       650-668   Error handling
+//     670-672   Cleanup (spinner stop, isProcessing = false)
 
 interface ThemeColors {
   text: string;
@@ -42,8 +101,8 @@ interface ParsedResponse {
 
 function getThemeColors(isDark: boolean): ThemeColors {
   return isDark
-    ? { text: "#c0caf5", muted: "#565f89", accent: "#7aa2f7", border: "#3b4261", source: "#ffffff", quote: "#ffd700" }
-    : { text: "#1a1b26", muted: "#9aa0b0", accent: "#2e4a8a", border: "#c8ccd4", source: "#1a1a2e", quote: "#ffd700" };
+    ? { text: "#c0caf5", muted: "#565f89", accent: "#7aa2f7", border: "#3b4261", source: "#ffffff", quote: "#e0af68" }
+    : { text: "#1a1b26", muted: "#9aa0b0", accent: "#2e4a8a", border: "#c8ccd4", source: "#383c5a", quote: "#c89a3c" };
 }
 
 function parseJSONResponse(response: string): ParsedResponse | null {
@@ -73,9 +132,9 @@ async function typeText(
 }
 
 const PAGGA_ART = [
-  "░█▀█░█░░░▀█▀░█▀▀░█▀▀░█░█░▀█▀░█░█░▀█▀",
-  "░█▀█░█░░░░█░░█░░░█▀▀░█▄█░░█░░█▀▄░░█░",
-  "░▀░▀░▀▀▀░▀▀▀░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀▀▀",
+  "░█▀█░█░░░▀█▀░█▀▀░█▀▀░█░█░▀█▀░█░█░▀█▀░",
+  "░█▀█░█░░░░█░░█░░░█▀▀░█▄█░░█░░█▀▄░░█░░",
+  "░▀░▀░▀▀▀░▀▀▀░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀░▀░▀▀▀░",
 ];
 
 const HELP_TEXT = `
@@ -86,137 +145,6 @@ Commands:
 `;
 
 const MAX_TURNS = 50;
-
-// ── Sidebar ──
-export class Sidebar {
-  private container: BoxRenderable;
-  private providerText: TextRenderable;
-  private statsText: TextRenderable;
-  private articleText: TextRenderable;
-  private historyBox: ScrollBoxRenderable;
-  private ctx: RenderContext;
-  private colors: ThemeColors;
-  private _visible: boolean = true;
-
-  constructor(ctx: RenderContext, colors: ThemeColors, isDark: boolean) {
-    this.ctx = ctx;
-    this.colors = colors;
-    const sidebarBg = isDark ? "#24283b" : "#d5d6db";
-
-    const label = (text: string) => new TextRenderable(ctx, {
-      content: ` ${text}`,
-      fg: colors.muted,
-      attributes: TextAttributes.BOLD,
-    });
-
-    const spacer = () => new TextRenderable(ctx, {
-      content: " ",
-      fg: colors.text,
-    });
-
-    const titleText = new TextRenderable(ctx, {
-      content: " ALICEWIKI",
-      fg: colors.accent,
-      attributes: TextAttributes.BOLD,
-    });
-
-    const separator = new TextRenderable(ctx, {
-      content: " " + "─".repeat(26),
-      fg: colors.muted,
-    });
-
-    const providerLabel = label("PROVIDER");
-    this.providerText = new TextRenderable(ctx, {
-      content: t` openai`,
-      fg: colors.accent,
-    });
-
-    const statsLabel = label("SESSION STATS");
-    this.statsText = new TextRenderable(ctx, {
-      content: t` Queries: 0  ·  Articles: 0`,
-      fg: colors.text,
-    });
-
-    const articleLabel = label("CURRENT ARTICLE");
-    this.articleText = new TextRenderable(ctx, {
-      content: " \u2014",
-      fg: colors.text,
-    });
-
-    const historyLabel = label("SEARCH HISTORY");
-    this.historyBox = new ScrollBoxRenderable(ctx, {
-      flexGrow: 1,
-      scrollY: true,
-      viewportCulling: true,
-    });
-
-    this.container = new BoxRenderable(ctx, {
-      borderStyle: "single",
-      borderColor: colors.border,
-      backgroundColor: sidebarBg,
-      paddingLeft: 1,
-      paddingRight: 1,
-      width: 30,
-      flexDirection: "column",
-      flexShrink: 0,
-    });
-
-    this.container.add(titleText);
-    this.container.add(separator);
-    this.container.add(spacer());
-    this.container.add(providerLabel);
-    this.container.add(this.providerText);
-    this.container.add(spacer());
-    this.container.add(statsLabel);
-    this.container.add(this.statsText);
-    this.container.add(spacer());
-    this.container.add(articleLabel);
-    this.container.add(this.articleText);
-    this.container.add(spacer());
-    this.container.add(historyLabel);
-    this.container.add(this.historyBox);
-  }
-
-  getContainer(): BoxRenderable {
-    return this.container;
-  }
-
-  toggle(): boolean {
-    this._visible = !this._visible;
-    this.container.visible = this._visible;
-    return this._visible;
-  }
-
-  isVisible(): boolean {
-    return this._visible;
-  }
-
-  setProvider(name: string) {
-    this.providerText.content = t` ${name}`;
-  }
-
-  updateStats(queries: number, articles: number) {
-    this.statsText.content = t` Queries: ${queries}  ·  Articles: ${articles}`;
-  }
-
-  setCurrentArticle(title: string | null) {
-    if (title) {
-      const truncated = title.length > 26 ? title.slice(0, 26) + "\u2026" : title;
-      this.articleText.content = t` ${truncated}`;
-    } else {
-      this.articleText.content = " \u2014";
-    }
-  }
-
-  addHistoryEntry(title: string) {
-    const display = title.length > 26 ? title.slice(0, 26) + "\u2026" : title;
-    const entry = new TextRenderable(this.ctx, {
-      content: t` ${display}`,
-      fg: this.colors.text,
-    });
-    this.historyBox.add(entry);
-  }
-}
 
 export async function startTUI() {
   const renderer = await createCliRenderer({
@@ -229,12 +157,162 @@ export async function startTUI() {
   const isDark = theme !== "light";
   const colors = getThemeColors(isDark);
 
+  // ── Header ──
+  let currentProvider: ProviderName = getDefaultProvider();
+
+  const headerText = new TextRenderable(renderer, {
+    content: t`${PAGGA_ART[0]}\n${PAGGA_ART[1]}  Current provider: ${currentProvider}\n${PAGGA_ART[2]}`,
+    fg: colors.accent,
+    attributes: TextAttributes.BOLD,
+  });
+
+  const headerBar = new BoxRenderable(renderer, {
+    borderStyle: "heavy",
+    borderColor: colors.border,
+    paddingLeft: 1,
+    width: "100%",
+    flexShrink: 0,
+  });
+  headerBar.add(headerText);
+
+  // ── Sidebar class ──
+  class Sidebar {
+    private container: BoxRenderable;
+    private queriesText: TextRenderable;
+    private articlesText: TextRenderable;
+    private historyBox: ScrollBoxRenderable;
+    private ctx: RenderContext;
+    private colors: ThemeColors;
+    private _visible: boolean = true;
+    private articleCache: Set<string> = new Set();
+
+    constructor(ctx: RenderContext, colors: ThemeColors, isDark: boolean) {
+      this.ctx = ctx;
+      this.colors = colors;
+      const sidebarBg = isDark ? "#24283b" : "#d5d6db";
+
+      const label = (text: string) => new TextRenderable(ctx, {
+        content: ` ${text}`,
+        fg: colors.muted,
+        attributes: TextAttributes.BOLD,
+      });
+
+      const spacer = () => new BoxRenderable(ctx, {
+        height: 1,
+        width: "100%",
+      });
+
+      const titleText = new TextRenderable(ctx, {
+        content: " ALICEWIKI",
+        fg: colors.accent,
+        attributes: TextAttributes.BOLD,
+      });
+
+      const separator = new TextRenderable(ctx, {
+        content: " " + "─".repeat(26),
+        fg: colors.muted,
+      });
+
+      const statsLabel = label("SESSION STATS");
+      this.queriesText = new TextRenderable(ctx, {
+        content: ` Queries: 0`,
+        fg: colors.text,
+      });
+      this.articlesText = new TextRenderable(ctx, {
+        content: ` Articles: 0`,
+        fg: colors.text,
+      });
+      const statsBox = new BoxRenderable(ctx, {
+        flexDirection: "column",
+        width: "100%",
+        flexShrink: 0,
+      });
+      statsBox.add(statsLabel);
+      statsBox.add(this.queriesText);
+      statsBox.add(this.articlesText);
+
+      const historyLabel = label("FETCHED ARTICLES");
+      this.historyBox = new ScrollBoxRenderable(ctx, {
+        flexGrow: 1,
+        scrollY: true,
+        viewportCulling: true,
+      });
+
+      const kbHint = (text: string) => new TextRenderable(ctx, {
+        content: ` ${text}`,
+        fg: colors.text,
+      });
+      const kbBox = new BoxRenderable(ctx, {
+        flexDirection: "column",
+        width: "100%",
+        flexShrink: 0,
+      });
+      kbBox.add(kbHint("Ctrl+B to hide sidebar"));
+      kbBox.add(kbHint("Alt+D to focus input bar"));
+      kbBox.add(kbHint("Ctrl+C to quit"));
+      kbBox.add(kbHint("Ctrl+click to open links"));
+
+      this.container = new BoxRenderable(ctx, {
+        borderStyle: "single",
+        borderColor: colors.border,
+        backgroundColor: sidebarBg,
+        paddingLeft: 1,
+        paddingRight: 1,
+        paddingTop: 1,
+        paddingBottom: 1,
+        width: 30,
+        flexDirection: "column",
+        flexShrink: 0,
+      });
+
+      this.container.add(titleText);
+      this.container.add(separator);
+      this.container.add(spacer());
+      this.container.add(statsBox);
+      this.container.add(spacer());
+      this.container.add(spacer());
+      this.container.add(historyLabel);
+      this.container.add(this.historyBox);
+      this.container.add(spacer());
+      this.container.add(kbBox);
+    }
+
+    getContainer(): BoxRenderable {
+      return this.container;
+    }
+
+    toggle(): boolean {
+      this._visible = !this._visible;
+      this.container.visible = this._visible;
+      return this._visible;
+    }
+
+    isVisible(): boolean {
+      return this._visible;
+    }
+
+    updateStats(queries: number, articles: number) {
+      this.queriesText.content = ` Queries: ${queries}`;
+      this.articlesText.content = ` Articles: ${articles}`;
+    }
+
+    addHistoryEntry(title: string) {
+      if (this.articleCache.has(title)) return;
+      this.articleCache.add(title);
+      const display = title.length > 26 ? title.slice(0, 26) + "\u2026" : title;
+      const entry = new TextRenderable(this.ctx, {
+        content: t` ${display}`,
+        fg: this.colors.text,
+      });
+      this.historyBox.add(entry);
+    }
+  }
+
+  // ── Sidebar init ──
   const sidebar = new Sidebar(renderer, colors, isDark);
   let queryCount = 0;
   let articleFetchCount = 0;
 
-  let currentProvider: ProviderName = getDefaultProvider();
-  sidebar.setProvider(currentProvider);
   let currentLLM = createLLM({ provider: currentProvider });
   let agent = createAgent(currentLLM);
   let conversationHistory: any[] = [];
@@ -242,6 +320,7 @@ export async function startTUI() {
   let turnCounter = 0;
   const turnIds: string[] = [];
 
+  // ── Messages Container ──
   const messagesContainer = new ScrollBoxRenderable(renderer, {
     id: "messages",
     width: "100%",
@@ -262,7 +341,7 @@ export async function startTUI() {
   });
 
   const statusText = new TextRenderable(renderer, {
-    content: t`${currentProvider}  ·  Ctrl+C to quit`,
+    content: t`${DEFAULT_MODELS[currentProvider]}`,
     fg: colors.muted,
   });
 
@@ -278,22 +357,7 @@ export async function startTUI() {
   inputBar.add(inputField);
   inputBar.add(statusText);
 
-  // ── Header ──
-  const headerText = new TextRenderable(renderer, {
-    content: t`${PAGGA_ART[0]}\n${PAGGA_ART[1]}  —  ${currentProvider}\n${PAGGA_ART[2]}`,
-    fg: colors.accent,
-    attributes: TextAttributes.BOLD,
-  });
-
-  const headerBar = new BoxRenderable(renderer, {
-    borderStyle: "heavy",
-    borderColor: colors.border,
-    paddingLeft: 1,
-    width: "100%",
-    flexShrink: 0,
-  });
-  headerBar.add(headerText);
-
+  // ── UI Layout ──
   const mainColumn = new BoxRenderable(renderer, {
     flexDirection: "column",
     flexGrow: 1,
@@ -314,6 +378,9 @@ export async function startTUI() {
   renderer.root.add(rootLayout);
 
   renderer.keyInput.on("keypress", (key: KeyEvent) => {
+    if (key.meta && key.name === "d") {
+      inputField.focus();
+    }
     if (key.ctrl && key.name === "b") {
       sidebar.toggle();
     }
@@ -412,9 +479,8 @@ export async function startTUI() {
           attributes: TextAttributes.ITALIC,
         }));
         addTurn(turn);
-        statusText.content = t`${currentProvider}  ·  Ctrl+C to quit`;
-        headerText.content = t`${PAGGA_ART[0]}\n${PAGGA_ART[1]}  —  ${currentProvider}\n${PAGGA_ART[2]}\n`;
-        sidebar.setProvider(currentProvider);
+        statusText.content = t`${DEFAULT_MODELS[currentProvider]}`;
+        headerText.content = t`${PAGGA_ART[0]}\n${PAGGA_ART[1]}  Current provider: ${currentProvider}\n${PAGGA_ART[2]}\n`;
       } catch (err) {
         const turn = new BoxRenderable(renderer, {
           flexDirection: "column",
@@ -589,7 +655,6 @@ export async function startTUI() {
       sidebar.updateStats(queryCount, articleFetchCount);
       if (parsed?.sources?.length > 0) {
         const firstSource = parsed.sources[0];
-        sidebar.setCurrentArticle(firstSource.title);
         sidebar.addHistoryEntry(firstSource.title);
         articleFetchCount++;
       }
