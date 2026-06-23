@@ -2,7 +2,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
-export type ProviderName = "openai" /* |  "opencode" */ | "anthropic" | "google";
+export type ProviderName = "openai" | "anthropic" | "google";
 
 export interface LLMConfig {
   provider: ProviderName;
@@ -10,9 +10,8 @@ export interface LLMConfig {
   temperature?: number;
 }
 
-const DEFAULT_MODELS: Record<ProviderName, string> = {
+export const DEFAULT_MODELS: Record<ProviderName, string> = {
   openai: "gpt-5.4-mini",
-  //opencode: "big-pickle",
   anthropic: "claude-haiku-4-5",
   google: "gemini-3.5-flash",
 };
@@ -26,21 +25,6 @@ export function createLLM(config: LLMConfig): any {
 
   // Get API key from each provider
   switch (config.provider) {
-    /*
-      case "opencode": {
-      const apiKey = process.env.OPENCODE_API_KEY;
-      const apiBase = process.env.OPENCODE_API_BASE;
-      if (!apiKey) {
-        throw new Error("OPENCODE_API_KEY is not set in .env");
-      }
-      return new ChatOpenAI({
-        model: modelName,
-        temperature,
-        apiKey,
-        baseURL: apiBase,
-      });
-    }
-    */ 
     case "openai": {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
@@ -81,12 +65,12 @@ export function createLLM(config: LLMConfig): any {
 
 export function getDefaultProvider(): ProviderName {
   const provider = process.env.DEFAULT_PROVIDER;
-  if (provider === "openai" || /* provider === "opencode"  || */ provider === "anthropic" || provider === "google") {
+  if (provider === "openai" || provider === "anthropic" || provider === "google") {
     return provider;
   }
   return "openai"
 }
 
 export function isValidProvider(name: string): name is ProviderName {
-  return name === "openai" || /* name === "opencode"  || */ name === "anthropic" || name === "google";
+  return name === "openai" ||  name === "anthropic" || name === "google";
 }

@@ -1,8 +1,12 @@
 #!/usr/bin/env bun
-import { startCLI, handleInput } from "./cli.ts";
+import { config } from "dotenv";
+import { resolve } from "path";
 import { runOneLiner } from "./one-liner.ts";
+import { startTUI } from "./tui.ts";
 
 async function main() {
+  config({ path: resolve(import.meta.dir, "../.env") });
+
   const args = process.argv.slice(2);
 
   if (args.length > 0) {
@@ -10,7 +14,7 @@ async function main() {
     await runOneLiner(query);
     process.exit(0);
   } else {
-    startCLI();
+    await startTUI();
   }
 }
 
