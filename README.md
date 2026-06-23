@@ -47,7 +47,7 @@ aw who is mary sue?
 
 ## Architecture
 
-```
+```text
 src/
   index.ts          Entry point. Routes to one-liner (CLI args) or interactive TUI.
   tui.tsx           React root component. Creates renderer, manages app state (messages,

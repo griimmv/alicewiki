@@ -197,6 +197,7 @@ function App({ colors, isDark }: AppProps) {
       .then(({ content: response, tokens }) => {
         setTotalTokens((prev) => prev + tokens.total);
         const parsed = parseJSONResponse(response);
+        setQueryCount((prev) => prev + 1);
         if (parsed) {
           setMessages((prev) =>
             prev.map((t) =>
@@ -205,7 +206,6 @@ function App({ colors, isDark }: AppProps) {
                 : t
             )
           );
-          setQueryCount((prev) => prev + 1);
           if (parsed.sources.length > 0) {
             const title = parsed.sources[0].title;
             if (!articleCacheRef.current.has(title)) {
