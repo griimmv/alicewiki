@@ -11,11 +11,13 @@ interface TurnData {
   sources?: Source[];
   raw?: string;
   error?: string;
+  help?: boolean;
 }
 
 interface MessageTurnProps {
   turn: TurnData;
   colors: ThemeColors;
+  onAnimationComplete?: () => void;
 }
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -33,10 +35,11 @@ function Spinner() {
   return <span>{SPINNER_FRAMES[frame]}</span>;
 }
 
-export function MessageTurn({ turn, colors }: MessageTurnProps) {
+export function MessageTurn({ turn, colors, onAnimationComplete }: MessageTurnProps) {
   const [quotesStage, setQuotesStage] = useState(-1);
   const [sourcesStage, setSourcesStage] = useState(-1);
   const mountedRef = useRef(true);
+  const animationDoneRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -50,11 +53,20 @@ export function MessageTurn({ turn, colors }: MessageTurnProps) {
     }, ms);
   }
 
+  function finishAnimation() {
+    if (!animationDoneRef.current) {
+      animationDoneRef.current = true;
+      onAnimationComplete?.();
+    }
+  }
+
   function onSummaryDone() {
     if (turn.quotes && turn.quotes.length > 0) {
       delayed(() => setQuotesStage(0), 200);
     } else if (turn.sources && turn.sources.length > 0) {
       delayed(() => setSourcesStage(0), 200);
+    } else {
+      delayed(finishAnimation, 200);
     }
   }
 
@@ -64,6 +76,8 @@ export function MessageTurn({ turn, colors }: MessageTurnProps) {
       delayed(() => setQuotesStage(index + 1), 200);
     } else if (turn.sources && turn.sources.length > 0) {
       delayed(() => setSourcesStage(0), 200);
+    } else {
+      delayed(finishAnimation, 200);
     }
   }
 
@@ -71,6 +85,8 @@ export function MessageTurn({ turn, colors }: MessageTurnProps) {
     const slen = turn.sources?.length ?? 0;
     if (index < slen - 1) {
       delayed(() => setSourcesStage(index + 1), 200);
+    } else {
+      delayed(finishAnimation, 200);
     }
   }
 
@@ -147,8 +163,15 @@ export function MessageTurn({ turn, colors }: MessageTurnProps) {
         </>
       )}
 
-      {hasRaw && !turn.error && (
-        <TypewriterText text={`  ${turn.raw}`} speed={15} fg={colors.text} />
+      {hasRaw && turn.help && !turn.error && (
+        <box borderStyle="single" borderColor="#2ecc71" padding={1} width="100%" flexDirection="column">
+          <text fg="#2ecc71"><b>  HELP</b></text>
+          <TypewriterText text={`  ${turn.raw}`} speed={15} onComplete={finishAnimation} fg={colors.text} />
+        </box>
+      )}
+
+      {hasRaw && !turn.help && !turn.error && (
+        <TypewriterText text={`  ${turn.raw}`} speed={15} onComplete={finishAnimation} fg={colors.text} />
       )}
     </box>
   );

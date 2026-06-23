@@ -3,7 +3,7 @@ import type { KeyEvent } from "@opentui/core";
 import { createRoot, useKeyboard, useRenderer, useSelectionHandler } from "@opentui/react";
 import { useState, useRef, useEffect } from "react";
 import { createAgent, runAgent } from "./agent.ts";
-import { createLLM, getDefaultProvider, isValidProvider, DEFAULT_MODELS } from "./llm.ts";
+import { createLLM, getDefaultProvider, isValidProvider, isValidModel, DEFAULT_MODELS, KNOWN_MODELS } from "./llm.ts";
 import type { ProviderName } from "./llm.ts";
 import { Header } from "./components/Header.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
@@ -58,7 +58,14 @@ const HELP_TEXT = `
 Commands:
   /help                 Show this help message
   /switch <provider>    Switch LLM provider (openai, anthropic, google)
+  /model <name>         Change model for current provider
   /quit                 Exit the application
+
+Keybindings:
+  Ctrl+B                Toggle sidebar visibility
+  Alt+D                 Focus the input bar
+  Ctrl+C                Quit
+  Ctrl+click            Open links
 `;
 
 const MAX_TURNS = 50;
@@ -72,12 +79,14 @@ interface AppProps {
 function App({ colors, isDark }: AppProps) {
   const renderer = useRenderer();
   const [currentProvider, setCurrentProvider] = useState<ProviderName>(getDefaultProvider());
+  const [currentModel, setCurrentModel] = useState(DEFAULT_MODELS[getDefaultProvider()]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [messages, setMessages] = useState<TurnData[]>([{ id: "welcome", query: "", raw: WELCOME_TEXT }]);
   const [queryCount, setQueryCount] = useState(0);
   const [articleFetchCount, setArticleFetchCount] = useState(0);
   const [articles, setArticles] = useState<string[]>([]);
+  const [totalTokens, setTotalTokens] = useState(0);
   const [inputKey, setInputKey] = useState(0);
 
   const agentRef = useRef(createAgent(createLLM({ provider: getDefaultProvider() })));
@@ -101,6 +110,11 @@ function App({ colors, isDark }: AppProps) {
     }
   });
 
+  function handleTurnAnimationComplete() {
+    isProcessingRef.current = false;
+    setIsProcessing(false);
+  }
+
   function handleSubmit(value: string) {
     if (isProcessingRef.current) return;
     const trimmed = value.trim();
@@ -114,7 +128,7 @@ function App({ colors, isDark }: AppProps) {
     if (trimmed === "/help") {
       const id = crypto.randomUUID();
       const lines = HELP_TEXT.trim().split("\n").map((l) => `  ${l}`).join("\n");
-      setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: lines }]);
+      setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: lines, help: true }]);
       return;
     }
 
@@ -122,7 +136,7 @@ function App({ colors, isDark }: AppProps) {
       const parts = trimmed.split(/\s+/);
       if (parts.length < 2 || !isValidProvider(parts[1])) {
         const id = crypto.randomUUID();
-        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: "  Usage: /switch <provider> (openai, anthropic, google)" }]);
+        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: "  Usage: /switch <provider> (openai, anthropic, google)", help: true }]);
         return;
       }
       const provider = parts[1].toLowerCase() as ProviderName;
@@ -130,16 +144,47 @@ function App({ colors, isDark }: AppProps) {
         const newLLM = createLLM({ provider });
         const newAgent = createAgent(newLLM);
         setCurrentProvider(provider);
+        setCurrentModel(DEFAULT_MODELS[provider]);
         agentRef.current = newAgent;
         conversationHistoryRef.current = [];
         const id = crypto.randomUUID();
-        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched to ${provider}` }]);
+        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched to ${provider} (model: ${DEFAULT_MODELS[provider]})`, help: true }]);
       } catch (err) {
         const id = crypto.randomUUID();
         setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Error: ${(err as Error).message}`, error: (err as Error).message }]);
       }
       return;
     }
+
+    if (trimmed.startsWith("/model")) {
+      const parts = trimmed.split(/\s+/);
+      if (parts.length < 2) {
+        const id = crypto.randomUUID();
+        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Usage: /model <model_name>\n  Known models for ${currentProvider}: ${KNOWN_MODELS[currentProvider].join(", ")}`, help: true }]);
+        return;
+      }
+      const modelName = parts.slice(1).join(" ");
+      if (!isValidModel(currentProvider, modelName)) {
+        const id = crypto.randomUUID();
+        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Unknown model "${modelName}" for ${currentProvider}.\n  Known models: ${KNOWN_MODELS[currentProvider].join(", ")}`, help: true }]);
+        return;
+      }
+      try {
+        const newLLM = createLLM({ provider: currentProvider, modelName });
+        const newAgent = createAgent(newLLM);
+        setCurrentModel(modelName);
+        agentRef.current = newAgent;
+        conversationHistoryRef.current = [];
+        const id = crypto.randomUUID();
+        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched model to ${modelName}`, help: true }]);
+      } catch (err) {
+        const id = crypto.randomUUID();
+        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Error: ${(err as Error).message}`, error: (err as Error).message }]);
+      }
+      return;
+    }
+
+    setInputKey((k) => k + 1);
 
     isProcessingRef.current = true;
     setIsProcessing(true);
@@ -149,7 +194,8 @@ function App({ colors, isDark }: AppProps) {
     setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), turn]);
 
     runAgent(agentRef.current, trimmed, conversationHistoryRef.current)
-      .then((response) => {
+      .then(({ content: response, tokens }) => {
+        setTotalTokens((prev) => prev + tokens.total);
         const parsed = parseJSONResponse(response);
         if (parsed) {
           setMessages((prev) =>
@@ -191,10 +237,12 @@ function App({ colors, isDark }: AppProps) {
               : t
           )
         );
+        // errors have no typewriter animation — release immediately
+        handleTurnAnimationComplete();
       })
       .finally(() => {
-        isProcessingRef.current = false;
-        setIsProcessing(false);
+        // isProcessing stays true until MessageTurn finishes its
+        // typewriter animation and calls handleTurnAnimationComplete()
       });
   }
 
@@ -207,19 +255,26 @@ function App({ colors, isDark }: AppProps) {
           queryCount={queryCount}
           articleCount={articleFetchCount}
           articles={articles}
+          totalTokens={totalTokens}
         />
       )}
       <box flexDirection="column" flexGrow={1} width="100%" height="100%">
         <Header currentProvider={currentProvider} colors={colors} />
-        <Messages messages={messages} colors={colors} />
+        <Messages messages={messages} colors={colors} onAnimationComplete={handleTurnAnimationComplete} />
         <InputBar
           colors={colors}
           currentProvider={currentProvider}
+          currentModel={currentModel}
           isProcessing={isProcessing}
           onSubmit={handleSubmit}
           inputKey={inputKey}
         />
       </box>
+      {isProcessing && (
+        <box position="absolute" bottom={0} right={0} borderStyle="single" borderColor="#e0af68" paddingLeft={1} paddingRight={1}>
+          <text fg="#e0af68">hold on, alice is still speaking</text>
+        </box>
+      )}
     </box>
   );
 }

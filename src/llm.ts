@@ -74,3 +74,22 @@ export function getDefaultProvider(): ProviderName {
 export function isValidProvider(name: string): name is ProviderName {
   return name === "openai" ||  name === "anthropic" || name === "google";
 }
+
+export const KNOWN_MODELS: Record<ProviderName, string[]> = {
+  openai: [
+    "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+    "gpt-5.4-mini", "o3", "o4-mini",
+  ],
+  anthropic: [
+    "claude-sonnet-4-5", "claude-haiku-4-5", "claude-3-5-sonnet-latest",
+    "claude-3-5-haiku-latest", "claude-opus-4-5",
+  ],
+  google: [
+    "gemini-3.5-flash", "gemini-3.5-pro", "gemini-2.5-flash",
+    "gemini-2.5-pro", "gemini-2.0-flash",
+  ],
+};
+
+export function isValidModel(provider: ProviderName, model: string): boolean {
+  return KNOWN_MODELS[provider].includes(model);
+}
