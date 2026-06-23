@@ -6,9 +6,10 @@ interface SidebarProps {
   queryCount: number;
   articleCount: number;
   articles: string[];
+  totalTokens: number;
 }
 
-export function Sidebar({ colors, isDark, queryCount, articleCount, articles }: SidebarProps) {
+export function Sidebar({ colors, isDark, queryCount, articleCount, articles, totalTokens }: SidebarProps) {
   const sidebarBg = isDark ? "#24283b" : "#d5d6db";
 
   return (
@@ -31,6 +32,7 @@ export function Sidebar({ colors, isDark, queryCount, articleCount, articles }: 
         <text fg={colors.muted}><b> SESSION STATS</b></text>
         <text fg={colors.text}> Queries: {queryCount}</text>
         <text fg={colors.text}> Articles: {articleCount}</text>
+        <text fg={colors.text}> Tokens: {totalTokens.toLocaleString()}</text>
       </box>
       <box height={1} width="100%" />
       <box height={1} width="100%" />
@@ -41,13 +43,6 @@ export function Sidebar({ colors, isDark, queryCount, articleCount, articles }: 
           return <text key={i} fg={colors.text}> {display}</text>;
         })}
       </scrollbox>
-      <box height={1} width="100%" />
-      <box flexDirection="column" width="100%" flexShrink={0}>
-        <text fg={colors.text}> Ctrl+B to hide sidebar</text>
-        <text fg={colors.text}> Alt+D to focus input bar</text>
-        <text fg={colors.text}> Ctrl+C to quit</text>
-        <text fg={colors.text}> Ctrl+click to open links</text>
-      </box>
     </box>
   );
 }
