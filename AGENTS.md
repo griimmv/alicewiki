@@ -7,8 +7,8 @@ Terminal AI Chatbot that fetches Wikipedia articles through the Wikipedia REST A
 ```
 src/
   index.ts        Entry point. Routes to one-liner mode (CLI args) or interactive mode (TUI).
-  tui.ts          Interactive mode via @opentui/core. Full-screen TUI with sidebar, header,
-                  scrollable messages, and input bar. Contains the Sidebar class inline.
+   tui.ts          Interactive mode via @opentui/core. Full-screen TUI with sidebar, header,
+                   scrollable messages, input bar, and keybinding hints. Contains Sidebar class inline.
   one-liner.ts    Bypasses the LLM: fetches Wikipedia directly, prints title, extract, and URL.
   llm.ts          Builds and routes LLM models to their API keys.
   agent.ts        Agent orchestrator: runs LLM with tool calling, parses structured JSON output.
@@ -31,7 +31,10 @@ Two modes depending on invocation:
 
 1. **TUI startup** (`tui.ts:startTUI`): creates a full-screen terminal UI via `@opentui/core` with an alternate-screen buffer.
 2. **Layout**: `rootLayout` → row of `[Sidebar | MainColumn]`.
-   - **Sidebar** (class defined inline in `tui.ts`, width 30): shows app title, provider, session stats, current article, and search history. Toggle with `Ctrl+B`.
+   - **Sidebar** (class defined inline in `tui.ts`, width 30, `flexShrink: 0`): shows app title, session stats
+  (queries/articles on separate lines), fetched articles (deduplicated via `articleCache: Set<string>`),
+  and keybinding hints (Ctrl+B toggle, Alt+D focus, Ctrl+C quit, Ctrl+click open link).
+  Toggle with `Ctrl+B`.
    - **MainColumn** = `[HeaderBar | MessagesContainer | InputBar]`:
      - **HeaderBar**: ASCII art logo + current provider name.
      - **MessagesContainer**: `ScrollBoxRenderable`, sticky-scroll to bottom, max 50 turns.
@@ -40,7 +43,7 @@ Two modes depending on invocation:
 4. **LLM tool calling** (`agent.ts`): conversation history + system prompt are sent to the LLM with the wikipedia tool registered. The LLM decides whether to invoke the tool.
 5. **Wikipedia fetch**: when the LLM calls the tool, `wikipediaTool` fetches the page and returns structured JSON (`title`, `extract`, `fullContent`, `url`, `thumbnail`).
 6. **LLM synthesis**: the tool result is fed back to the LLM, which produces a structured JSON response (`summary`, `quotes`, `sources`).
-7. **Output**: rendered inside the TUI as bordered boxes for user query, summary, direct quotes, and sources. Sidebar stats and history are updated.
+7. **Output**: rendered inside the TUI as bordered boxes for user query, summary, direct quotes, and sources. Sidebar stats (queries/articles on separate lines) and fetched articles list are updated.
 
 ## Providers
 
@@ -60,7 +63,10 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
 | Key | Action |
 |-----|--------|
 | `Ctrl+B` | Toggle sidebar visibility |
-| `Ctrl+Q` / `/quit` | Exit the application |
+| `Alt+D` | Focus the input bar |
+| `/quit` | Exit the application |
+
+Keybinding hints are also displayed at the bottom of the sidebar for quick reference.
 
 ## Tool Details
 
@@ -112,6 +118,5 @@ The layout (bordered summary/quotes/sources boxes with labels) renders immediate
 
 ## Design Goals
 
-- **Lightweight**: minimal dependencies (`@opentui/core`, `langchain`, `@langchain/*`, `zod`, `dotenv`, `wikipedia`).
 - **Resource-efficient**: no browser automation, no heavy frameworks. Single-threaded Node.js process.
 - **Rich TUI**: `@opentui/core` provides a full-screen terminal UI with split-panel layout, scrollable content, theming, and keyboard input handling.
