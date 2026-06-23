@@ -2,7 +2,7 @@
 import { config } from "dotenv";
 import { resolve } from "path";
 import { runOneLiner } from "./one-liner.ts";
-import { startTUI } from "./tui.ts";
+import { startTUI } from "./tui.tsx";
 
 async function main() {
   config({ path: resolve(import.meta.dir, "../.env") });
