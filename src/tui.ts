@@ -652,12 +652,13 @@ export async function startTUI() {
       }
 
       queryCount++;
-      sidebar.updateStats(queryCount, articleFetchCount);
       if (parsed?.sources?.length > 0) {
         const firstSource = parsed.sources[0];
         sidebar.addHistoryEntry(firstSource.title);
         articleFetchCount++;
       }
+      sidebar.updateStats(queryCount, articleFetchCount);
+
     } catch (err) {
       const errorBox = new BoxRenderable(renderer, {
         borderStyle: "single",
