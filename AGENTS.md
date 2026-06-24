@@ -6,28 +6,28 @@ Terminal AI Chatbot that fetches Wikipedia articles through the Wikipedia REST A
 
 ```
 src/
-  index.ts          Entry point. Routes to one-liner mode (CLI args) or interactive mode (TUI).
-  tui.tsx           React root via @opentui/react. Full-screen TUI with sidebar, header,
-                    scrollable messages, input bar, keybinding hints, and token tracking.
-  one-liner.ts      Bypasses the LLM: fetches Wikipedia directly, prints title, extract, and URL.
-  llm.ts            Builds and routes LLM models to their API keys.
-  agent.ts          Agent orchestrator: runs LLM with tool calling (max 2 loops),
-                    parses structured JSON output, returns token usage metadata.
-  components/
-    Header.tsx        ASCII art logo + current provider name in a heavy-bordered box.
-    Sidebar.tsx       Session stats (queries, articles, token count), fetched articles list,
-                      and keybinding hints. Stateless — receives all data as props.
-    Messages.tsx      ScrollBox container mapping over message turns.
-    MessageTurn.tsx   Renders one user+assistant exchange. User query in rounded box,
-                      response with summary/quotes/sources in bordered boxes. Sequential
-                      typewriter animation via onComplete callbacks.
-    InputBar.tsx      InputRenderable + status line (provider · model). Remounts on
-                      Alt+D to regain focus. Detaches onSubmit handler during
-                      processing (input guard) so users cannot spam queries.
-    TypewriterText.tsx Char-by-char text reveal via useState + useEffect interval
-                      (15ms summary, 10ms quotes/sources). Replaces imperative typeText().
-  tools/
-    wikipedia.ts    Wikipedia tool using the `wikipedia` npm package, outputs JSON.
+├── index.ts          # Entry point. Routes to one-liner mode (CLI args) or interactive mode (TUI).
+├── tui.tsx           # React root via @opentui/react. Full-screen TUI with sidebar, header,
+│                     # scrollable messages, input bar, keybinding hints, and token tracking.
+├── one-liner.ts      # Bypasses the LLM: fetches Wikipedia directly, prints title, extract, and URL.
+├── llm.ts            # Builds and routes LLM models to their API keys.
+├── agent.ts          # Agent orchestrator: runs LLM with tool calling (max 2 loops),
+│                     # parses structured JSON output, returns token usage metadata.
+├── components/
+│   ├── Header.tsx        # ASCII art logo + current provider name in a heavy-bordered box.
+│   ├── Sidebar.tsx       # Session stats (queries, articles, token count), fetched articles list,
+│   │                     # and keybinding hints. Stateless — receives all data as props.
+│   ├── Messages.tsx      # ScrollBox container mapping over message turns.
+│   ├── MessageTurn.tsx   # Renders one user+assistant exchange. User query in rounded box,
+│   │                     # response with summary/quotes/sources in bordered boxes. Sequential
+│   │                     # typewriter animation via onComplete callbacks.
+│   ├── InputBar.tsx      # InputRenderable + status line (provider · model). Remounts on
+│   │                     # Alt+D to regain focus. Detaches onSubmit handler during
+│   │                     # processing (input guard) so users cannot spam queries.
+│   └── TypewriterText.tsx # Char-by-char text reveal via useState + useEffect interval
+│                         # (15ms summary, 10ms quotes/sources). Replaces imperative typeText().
+└── tools/
+    └── wikipedia.ts    # Wikipedia tool using the `wikipedia` npm package, outputs JSON.
 ```
 
 ## Flow
@@ -85,8 +85,6 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
 | `Ctrl+B` | Toggle sidebar visibility |
 | `Alt+D` | Focus the input bar |
 | `/quit` | Exit the application |
-
-Keybinding hints are also displayed at the bottom of the sidebar for quick reference.
 
 ## Tool Details
 
