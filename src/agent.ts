@@ -43,9 +43,11 @@ export async function runAgent(
     );
 
     if (result.usage_metadata) {
-      tokens.input += result.usage_metadata.input_tokens ?? 0;
-      tokens.output += result.usage_metadata.output_tokens ?? 0;
-      tokens.total += result.usage_metadata.total_tokens ?? 0;
+      const inTokens = result.usage_metadata.input_tokens ?? 0;
+      const outTokens = result.usage_metadata.output_tokens ?? 0;
+      tokens.input += inTokens;
+      tokens.output += outTokens;
+      tokens.total += result.usage_metadata.total_tokens ?? (inTokens + outTokens);
     }
 
     // checks if result.content is an array or not and converts it into string

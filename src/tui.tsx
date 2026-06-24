@@ -43,12 +43,23 @@ export function getThemeColors(isDark: boolean): ThemeColors {
     : { text: "#1a1b26", muted: "#9aa0b0", accent: "#2e4a8a", border: "#c8ccd4", source: "#383c5a", quote: "#c89a3c" };
 }
 
+// Parse LLM response and validate it matches the expected ParsedResponse shape
 export function parseJSONResponse(response: string): ParsedResponse | null {
   try {
     let jsonStr = response.trim();
     const match = response.match(/```(?:json)?\n([\s\S]*?)\n```/);
     if (match) jsonStr = match[1];
-    return JSON.parse(jsonStr);
+    const parsed: unknown = JSON.parse(jsonStr);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      typeof (parsed as any).summary === "string" &&
+      Array.isArray((parsed as any).quotes) &&
+      Array.isArray((parsed as any).sources)
+    ) {
+      return parsed as ParsedResponse;
+    }
+    return null;
   } catch {
     return null;
   }
