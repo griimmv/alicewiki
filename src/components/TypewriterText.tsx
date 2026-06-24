@@ -14,6 +14,7 @@ export function TypewriterText({ text, speed = 15, onComplete, fg }: TypewriterT
   useEffect(() => {
     doneRef.current = false;
     if (!text) {
+      setDisplayed("");
       doneRef.current = true;
       onComplete?.();
       return;
