@@ -20,13 +20,20 @@ export function extractWikiTopic(query: string): string {
     .trim() || query;
 }
 
+export interface TokenUsage {
+  input: number;
+  output: number;
+  total: number;
+}
+
 export async function runAgent(
   agent: any,
   input: string,
   history: any[] = []
-): Promise<string> {
+): Promise<{ content: string; tokens: TokenUsage }> {
   const messages: any[] = [...history, { role: "user", content: input }];
-  const maxLoops = 5;
+  const maxLoops = 2;
+  const tokens: TokenUsage = { input: 0, output: 0, total: 0 };
 
   // infinite loop safeguard for llm to prevent token wasted on unnecessary tasks
   for (let i = 0; i < maxLoops; i++) {
@@ -34,6 +41,14 @@ export async function runAgent(
       [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
       { tools: agent.tools }
     );
+
+    if (result.usage_metadata) {
+      const inTokens = result.usage_metadata.input_tokens ?? 0;
+      const outTokens = result.usage_metadata.output_tokens ?? 0;
+      tokens.input += inTokens;
+      tokens.output += outTokens;
+      tokens.total += result.usage_metadata.total_tokens ?? (inTokens + outTokens);
+    }
 
     // checks if result.content is an array or not and converts it into string
     const content =
@@ -58,15 +73,18 @@ export async function runAgent(
     }
 
     const parsed = parseJSONFromText(content);
-    if (parsed) return JSON.stringify(parsed);
-    return content;
+    if (parsed) return { content: JSON.stringify(parsed), tokens };
+    return { content, tokens };
   }
 
-  return JSON.stringify({
-    summary: "I couldn't complete this request within the allowed steps.",
-    quotes: [],
-    sources: []
-  });
+  return {
+    content: JSON.stringify({
+      summary: "I couldn't complete this request within the allowed steps.",
+      quotes: [],
+      sources: []
+    }),
+    tokens,
+  };
 }
 
 function parseJSONFromText(text: string): Record<string, unknown> | null {
