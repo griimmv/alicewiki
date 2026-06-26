@@ -1,3 +1,4 @@
+import { RGBA } from "@opentui/core";
 import type { ThemeColors } from "../tui.tsx";
 import type { ProviderName } from "../llm.ts";
 
@@ -11,19 +12,21 @@ interface SetupModalProps {
   visible: boolean;
   provider: ProviderName;
   colors: ThemeColors;
+  isDark: boolean;
   onSave: (provider: ProviderName, key: string) => void;
   onClose: () => void;
 }
 
-export function SetupModal({ visible, provider, colors, onSave, onClose }: SetupModalProps) {
+export function SetupModal({ visible, provider, colors, isDark, onSave, onClose }: SetupModalProps) {
   if (!visible) return null;
 
   const info = PROVIDER_INFO[provider];
+  const modalBg = isDark ? "#1a1b26" : "#ffffff";
 
   return (
-    <>
-      <box position="absolute" top={0} left={0} right={0} bottom={0} width="100%" height="100%" backgroundColor="rgba(0,0,0,0.6)" />
-      <box position="absolute" top={4} left={4} width={60} borderStyle="single" borderColor={colors.accent} padding={2} flexDirection="column">
+    <box position="absolute" top={0} left={0} right={0} bottom={0} width="100%" height="100%" flexDirection="column" justifyContent="center" alignItems="center">
+      <box position="absolute" top={0} left={0} right={0} bottom={0} width="100%" height="100%" backgroundColor={RGBA.fromValues(0, 0, 0, 0.6)} />
+      <box width={60} borderStyle="single" borderColor={colors.accent} padding={2} flexDirection="column" backgroundColor={modalBg}>
         <text fg={colors.accent}><b>  Set {info.name} API Key</b></text>
         <box height={1} />
         <text fg={colors.text}>  Get your API key from:</text>
@@ -47,6 +50,6 @@ export function SetupModal({ visible, provider, colors, onSave, onClose }: Setup
         <box height={1} />
         <text fg={colors.muted}>  This key will be stored in ~/.alicewiki/alicewiki.db</text>
       </box>
-    </>
+    </box>
   );
 }

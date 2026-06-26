@@ -102,7 +102,7 @@ function App({ colors, isDark }: AppProps) {
   const [totalTokens, setTotalTokens] = useState(0);
   const [inputKey, setInputKey] = useState(0);
 
-  const agentRef = useRef(createAgent(createLLM({ provider: getDefaultProvider() })));
+  const agentRef = useRef<any>(null);
   const conversationHistoryRef = useRef<any[]>([]);
   const articleCacheRef = useRef<Set<string>>(new Set());
   const isProcessingRef = useRef(false);
@@ -161,21 +161,13 @@ function App({ colors, isDark }: AppProps) {
         return;
       }
       const provider = parts[1].toLowerCase() as ProviderName;
-      try {
-        const newLLM = createLLM({ provider });
-        const newAgent = createAgent(newLLM);
-        setCurrentProvider(provider);
-        setCurrentModel(DEFAULT_MODELS[provider]);
-        agentRef.current = newAgent;
-        conversationHistoryRef.current = [];
-        const id = crypto.randomUUID();
-        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched to ${provider} (model: ${DEFAULT_MODELS[provider]})`, help: true }]);
-        // For when user use /switch. It gives the db an update that user used /switch
-        updateSessionProvider(provider, DEFAULT_MODELS[provider]);
-      } catch (err) {
-        const id = crypto.randomUUID();
-        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Error: ${(err as Error).message}`, error: (err as Error).message }]);
-      }
+      setCurrentProvider(provider);
+      setCurrentModel(DEFAULT_MODELS[provider]);
+      agentRef.current = null;
+      conversationHistoryRef.current = [];
+      const id = crypto.randomUUID();
+      setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched to ${provider} (model: ${DEFAULT_MODELS[provider]})`, help: true }]);
+      updateSessionProvider(provider, DEFAULT_MODELS[provider]);
       return;
     }
 
@@ -204,24 +196,27 @@ function App({ colors, isDark }: AppProps) {
         setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Unknown model "${modelName}" for ${currentProvider}.\n  Known models: ${KNOWN_MODELS[currentProvider].join(", ")}`, help: true }]);
         return;
       }
-      try {
-        const newLLM = createLLM({ provider: currentProvider, modelName });
-        const newAgent = createAgent(newLLM);
-        setCurrentModel(modelName);
-        agentRef.current = newAgent;
-        conversationHistoryRef.current = [];
-        const id = crypto.randomUUID();
-        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched model to ${modelName}`, help: true }]);
-        // For when user use /switch. It gives the db an update that user used /model 
-        updateSessionProvider(currentProvider, modelName);
-      } catch (err) {
-        const id = crypto.randomUUID();
-        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Error: ${(err as Error).message}`, error: (err as Error).message }]);
-      }
+      setCurrentModel(modelName);
+      agentRef.current = null;
+      conversationHistoryRef.current = [];
+      const id = crypto.randomUUID();
+      setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched model to ${modelName}`, help: true }]);
+      updateSessionProvider(currentProvider, modelName);
       return;
     }
 
     setInputKey((k) => k + 1);
+
+    // init agent lazily so the TUI starts even without a configured API key
+    if (!agentRef.current) {
+      try {
+        agentRef.current = createAgent(createLLM({ provider: currentProvider, modelName: currentModel }));
+      } catch (err) {
+        const id = crypto.randomUUID();
+        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: trimmed, error: (err as Error).message }]);
+        return;
+      }
+    }
 
     isProcessingRef.current = true;
     setIsProcessing(true);
@@ -345,16 +340,12 @@ function App({ colors, isDark }: AppProps) {
           inputKey={inputKey}
         />
       </box>
-      {isProcessing && (
-        <box position="absolute" bottom={0} right={0} borderStyle="single" borderColor="#e0af68" paddingLeft={1} paddingRight={1}>
-          <text fg="#e0af68">hold on, alice is still speaking</text>
-        </box>
-      )}
       {setupModal.visible && setupModal.provider && (
         <SetupModal
           visible={true}
           provider={setupModal.provider}
           colors={colors}
+          isDark={isDark}
           onSave={(provider, key) => {
             setCredential(provider, key);
             setSetupModal({ visible: false, provider: null });
