@@ -1,6 +1,7 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { getCredential } from "./db.ts";
 
 export type ProviderName = "openai" | "anthropic" | "google";
 
@@ -26,9 +27,9 @@ export function createLLM(config: LLMConfig): any {
   // Get API key from each provider
   switch (config.provider) {
     case "openai": {
-      const apiKey = process.env.OPENAI_API_KEY;
+      const apiKey = getCredential("openai") || process.env.OPENAI_API_KEY;
       if (!apiKey) {
-        throw new Error("OPENAI_API_KEY is not set in .env");
+        throw new Error("OPENAI_API_KEY is not set");
       }
       return new ChatOpenAI({
         model: modelName,
@@ -37,9 +38,9 @@ export function createLLM(config: LLMConfig): any {
       });
     }
     case "anthropic": {
-      const apiKey = process.env.ANTHROPIC_API_KEY;
+      const apiKey = getCredential("anthropic") || process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
-        throw new Error("ANTHROPIC_API_KEY is not set in .env");
+        throw new Error("ANTHROPIC_API_KEY is not set");
       }
       return new ChatAnthropic({
         model: modelName,
@@ -48,9 +49,9 @@ export function createLLM(config: LLMConfig): any {
       });
     }
     case "google": {
-      const apiKey = process.env.GOOGLE_API_KEY;
+      const apiKey = getCredential("google") || process.env.GOOGLE_API_KEY;
       if (!apiKey) {
-        throw new Error("GOOGLE_API_KEY is not set in .env");
+        throw new Error("GOOGLE_API_KEY is not set");
       }
       return new ChatGoogleGenerativeAI({
         model: modelName,

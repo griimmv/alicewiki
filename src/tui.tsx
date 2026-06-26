@@ -10,6 +10,7 @@ import { Sidebar } from "./components/Sidebar.tsx";
 import { InputBar } from "./components/InputBar.tsx";
 import { Messages } from "./components/Messages.tsx";
 import type { TurnData } from "./components/MessageTurn.tsx";
+import { getCurrentSessionId, saveTurn, updateSessionProvider } from "./db.ts";
 
 export interface ThemeColors {
   text: string;
@@ -43,7 +44,7 @@ export function getThemeColors(isDark: boolean): ThemeColors {
     : { text: "#1a1b26", muted: "#9aa0b0", accent: "#2e4a8a", border: "#c8ccd4", source: "#383c5a", quote: "#c89a3c" };
 }
 
-// Parse LLM response and validate it matches the expected ParsedResponse shape
+// Parse LLM response and validate if it matches the expected ParsedResponse shape
 export function parseJSONResponse(response: string): ParsedResponse | null {
   try {
     let jsonStr = response.trim();
@@ -80,7 +81,7 @@ Keybindings:
 `;
 
 const MAX_TURNS = 50;
-const WELCOME_TEXT = "  Welcome to AliceWiki! A place where you can go deep dive into a topic using Wikipedia API as the source. \n  Start asking question on the input box below \n\n  Have fun deep diving! or should i call it.. Down the rabbit hole!";
+const WELCOME_TEXT = "  Welcome to AliceWiki! A place where you can go deep dive into a topic using Wikipedia as the source. \n  Start asking question on the input box below \n\n  Have fun deep diving! or should i call it.. Down the rabbit hole!";
 
 interface AppProps {
   colors: ThemeColors;
@@ -104,6 +105,7 @@ function App({ colors, isDark }: AppProps) {
   const conversationHistoryRef = useRef<any[]>([]);
   const articleCacheRef = useRef<Set<string>>(new Set());
   const isProcessingRef = useRef(false);
+  const turnIndexRef = useRef(0); // sequential turn number used when saving turns/messageTurn(s) to SQLite
 
   useSelectionHandler((selection) => {
     const text = selection.getSelectedText();
@@ -160,6 +162,8 @@ function App({ colors, isDark }: AppProps) {
         conversationHistoryRef.current = [];
         const id = crypto.randomUUID();
         setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched to ${provider} (model: ${DEFAULT_MODELS[provider]})`, help: true }]);
+        // For when user use /switch. It gives the db an update that user used /switch
+        updateSessionProvider(provider, DEFAULT_MODELS[provider]);
       } catch (err) {
         const id = crypto.randomUUID();
         setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Error: ${(err as Error).message}`, error: (err as Error).message }]);
@@ -188,6 +192,8 @@ function App({ colors, isDark }: AppProps) {
         conversationHistoryRef.current = [];
         const id = crypto.randomUUID();
         setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched model to ${modelName}`, help: true }]);
+        // For when user use /switch. It gives the db an update that user used /model 
+        updateSessionProvider(currentProvider, modelName);
       } catch (err) {
         const id = crypto.randomUUID();
         setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Error: ${(err as Error).message}`, error: (err as Error).message }]);
@@ -209,6 +215,7 @@ function App({ colors, isDark }: AppProps) {
         setTotalTokens((prev) => prev + tokens.total);
         const parsed = parseJSONResponse(response);
         setQueryCount((prev) => prev + 1);
+
         if (parsed) {
           setMessages((prev) =>
             prev.map((t) =>
@@ -225,6 +232,20 @@ function App({ colors, isDark }: AppProps) {
             }
             setArticleFetchCount((prev) => prev + 1);
           }
+          // persist structured LLM response (summary, quotes, sources) to the current session
+          const sessionId = getCurrentSessionId();
+          if (sessionId !== null) {
+            turnIndexRef.current += 1;
+            saveTurn(sessionId, {
+              query: trimmed,
+              turnIndex: turnIndexRef.current,
+              summary: parsed.summary,
+              quotes: JSON.stringify(parsed.quotes),
+              sources: JSON.stringify(parsed.sources),
+              inputTokens: tokens.input,
+              outputTokens: tokens.output,
+            });
+          }
         } else {
           setMessages((prev) =>
             prev.map((t) =>
@@ -233,6 +254,18 @@ function App({ colors, isDark }: AppProps) {
                 : t
             )
           );
+          // persist raw unparsed LLM response to the current session
+          const sessionId = getCurrentSessionId();
+          if (sessionId !== null) {
+            turnIndexRef.current += 1;
+            saveTurn(sessionId, {
+              query: trimmed,
+              turnIndex: turnIndexRef.current,
+              raw: response,
+              inputTokens: tokens.input,
+              outputTokens: tokens.output,
+            });
+          }
         }
         conversationHistoryRef.current.push({ role: "user", content: trimmed });
         conversationHistoryRef.current.push({ role: "assistant", content: response });
@@ -248,6 +281,16 @@ function App({ colors, isDark }: AppProps) {
               : t
           )
         );
+        // persist failed turn to the current session so errors aren't lost
+        const sessionId = getCurrentSessionId();
+        if (sessionId !== null) {
+          turnIndexRef.current += 1;
+          saveTurn(sessionId, {
+            query: trimmed,
+            turnIndex: turnIndexRef.current,
+            error: (err as Error).message,
+          });
+        }
         // errors have no typewriter animation — release immediately
         handleTurnAnimationComplete();
       })
