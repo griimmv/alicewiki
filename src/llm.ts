@@ -27,9 +27,9 @@ export function createLLM(config: LLMConfig): any {
   // Get API key from each provider
   switch (config.provider) {
     case "openai": {
-      const apiKey = getCredential("openai") || process.env.OPENAI_API_KEY;
+      const apiKey = getCredential("openai");
       if (!apiKey) {
-        throw new Error("OPENAI_API_KEY is not set");
+        throw new Error("OpenAI API key is not set. Use /setKey openai <key> to add it.");
       }
       return new ChatOpenAI({
         model: modelName,
@@ -38,9 +38,9 @@ export function createLLM(config: LLMConfig): any {
       });
     }
     case "anthropic": {
-      const apiKey = getCredential("anthropic") || process.env.ANTHROPIC_API_KEY;
+      const apiKey = getCredential("anthropic");
       if (!apiKey) {
-        throw new Error("ANTHROPIC_API_KEY is not set");
+        throw new Error("Anthropic API key is not set. Use /setKey anthropic to add it.");
       }
       return new ChatAnthropic({
         model: modelName,
@@ -49,9 +49,9 @@ export function createLLM(config: LLMConfig): any {
       });
     }
     case "google": {
-      const apiKey = getCredential("google") || process.env.GOOGLE_API_KEY;
+      const apiKey = getCredential("google");
       if (!apiKey) {
-        throw new Error("GOOGLE_API_KEY is not set");
+        throw new Error("Google API key is not set. Use /setKey google to add it.");
       }
       return new ChatGoogleGenerativeAI({
         model: modelName,

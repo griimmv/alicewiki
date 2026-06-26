@@ -24,7 +24,6 @@ export function initDB(): void {
   } catch {}
 
   createTables();
-  autoImportCredentials();
   currentSessionId = createSession();
 }
 
@@ -67,30 +66,6 @@ function createTables(): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
-}
-
-function autoImportCredentials(): void {
-  if (!db) return;
-
-  const row = db.query("SELECT COUNT(*) as c FROM credentials").get() as { c: number };
-  if (row.c > 0) return;
-
-  const providers: { name: string; envKey: string }[] = [
-    { name: "openai", envKey: "OPENAI_API_KEY" },
-    { name: "anthropic", envKey: "ANTHROPIC_API_KEY" },
-    { name: "google", envKey: "GOOGLE_API_KEY" },
-  ];
-
-  const insert = db.query(
-    "INSERT OR IGNORE INTO credentials (provider, api_key, updated_at) VALUES (?, ?, datetime('now'))"
-  );
-
-  for (const p of providers) {
-    const key = process.env[p.envKey];
-    if (key) {
-      insert.run(p.name, key);
-    }
-  }
 }
 
 function createSession(): number {

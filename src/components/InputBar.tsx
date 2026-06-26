@@ -6,11 +6,12 @@ interface InputBarProps {
   currentProvider: ProviderName;
   currentModel: string;
   isProcessing: boolean;
+  isFocused: boolean;
   onSubmit: (value: string) => void;
   inputKey: number;
 }
 
-export function InputBar({ colors, currentProvider, currentModel, isProcessing, onSubmit, inputKey }: InputBarProps) {
+export function InputBar({ colors, currentProvider, currentModel, isProcessing, isFocused, onSubmit, inputKey }: InputBarProps) {
   return (
     <box borderStyle="heavy" borderColor={colors.border} paddingLeft={1} paddingRight={1} width="100%" flexDirection="column" flexShrink={0}>
       <input
@@ -18,8 +19,8 @@ export function InputBar({ colors, currentProvider, currentModel, isProcessing, 
         placeholder="Type a question...  (/help for commands)"
         textColor={colors.text}
         cursorColor={colors.accent}
-        onSubmit={isProcessing ? undefined : onSubmit} // input guard so users cannot spam queries
-        focused={true}
+        onSubmit={isProcessing ? undefined : onSubmit}
+        focused={isFocused}
       />
       <text fg={colors.muted}>{currentProvider} · {currentModel}</text>
     </box>

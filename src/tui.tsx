@@ -10,7 +10,8 @@ import { Sidebar } from "./components/Sidebar.tsx";
 import { InputBar } from "./components/InputBar.tsx";
 import { Messages } from "./components/Messages.tsx";
 import type { TurnData } from "./components/MessageTurn.tsx";
-import { getCurrentSessionId, saveTurn, updateSessionProvider } from "./db.ts";
+import { getCurrentSessionId, saveTurn, updateSessionProvider, setCredential } from "./db.ts";
+import { SetupModal } from "./components/SetupModal.tsx";
 
 export interface ThemeColors {
   text: string;
@@ -106,6 +107,9 @@ function App({ colors, isDark }: AppProps) {
   const articleCacheRef = useRef<Set<string>>(new Set());
   const isProcessingRef = useRef(false);
   const turnIndexRef = useRef(0); // sequential turn number used when saving turns/messageTurn(s) to SQLite
+  const [setupModal, setSetupModal] = useState<{ visible: boolean; provider: ProviderName | null }>({ visible: false, provider: null });
+  const setupModalRef = useRef(setupModal);
+  setupModalRef.current = setupModal;
 
   useSelectionHandler((selection) => {
     const text = selection.getSelectedText();
@@ -115,6 +119,10 @@ function App({ colors, isDark }: AppProps) {
   });
 
   useKeyboard((key: KeyEvent) => {
+    if (key.name === "escape" && setupModalRef.current.visible) {
+      setSetupModal({ visible: false, provider: null });
+      return;
+    }
     if (key.meta && key.name === "d") {
       setInputKey((k) => k + 1);
     }
@@ -168,6 +176,18 @@ function App({ colors, isDark }: AppProps) {
         const id = crypto.randomUUID();
         setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Error: ${(err as Error).message}`, error: (err as Error).message }]);
       }
+      return;
+    }
+
+    if (trimmed.startsWith("/setKey")) {
+      const parts = trimmed.split(/\s+/);
+      if (parts.length < 2 || !isValidProvider(parts[1])) {
+        const id = crypto.randomUUID();
+        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: "  Usage: /setKey <provider>\n  Providers: openai, anthropic, google", help: true }]);
+        return;
+      }
+      const provider = parts[1].toLowerCase() as ProviderName;
+      setSetupModal({ visible: true, provider });
       return;
     }
 
@@ -320,6 +340,7 @@ function App({ colors, isDark }: AppProps) {
           currentProvider={currentProvider}
           currentModel={currentModel}
           isProcessing={isProcessing}
+          isFocused={!setupModal.visible}
           onSubmit={handleSubmit}
           inputKey={inputKey}
         />
@@ -328,6 +349,18 @@ function App({ colors, isDark }: AppProps) {
         <box position="absolute" bottom={0} right={0} borderStyle="single" borderColor="#e0af68" paddingLeft={1} paddingRight={1}>
           <text fg="#e0af68">hold on, alice is still speaking</text>
         </box>
+      )}
+      {setupModal.visible && setupModal.provider && (
+        <SetupModal
+          visible={true}
+          provider={setupModal.provider}
+          colors={colors}
+          onSave={(provider, key) => {
+            setCredential(provider, key);
+            setSetupModal({ visible: false, provider: null });
+          }}
+          onClose={() => setSetupModal({ visible: false, provider: null })}
+        />
       )}
     </box>
   );
