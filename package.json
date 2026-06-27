@@ -18,7 +18,6 @@
     "@langchain/openai": "^1.4.7",
     "@opentui/core": "0.4.1",
     "@opentui/react": "^0.4.1",
-    "dotenv": "^17.4.2",
     "langchain": "^1.4.4",
     "react": "^19.2.7",
     "wikipedia": "^2.5.0",
