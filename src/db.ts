@@ -84,8 +84,7 @@ function createSession(): number {
   const provider = process.env.DEFAULT_PROVIDER || "openai";
   const result = db.run(
     "INSERT INTO sessions (name, provider, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))",
-    "default",
-    provider
+    ["default", provider]
   );
   return Number(result.lastInsertRowid);
 }
@@ -105,8 +104,7 @@ export function setCredential(provider: string, apiKey: string): void {
   db.run(
     `INSERT INTO credentials (provider, api_key, updated_at) VALUES (?, ?, datetime('now'))
      ON CONFLICT(provider) DO UPDATE SET api_key = excluded.api_key, updated_at = datetime('now')`,
-    provider,
-    apiKey
+    [provider, apiKey]
   );
 }
 
@@ -129,17 +127,7 @@ export function saveTurn(
   db.run(
     `INSERT INTO turns (session_id, turn_index, query, summary, quotes, sources, raw, error, help, input_tokens, output_tokens, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-    sessionId,
-    data.turnIndex,
-    data.query,
-    data.summary ?? null,
-    data.quotes ?? null,
-    data.sources ?? null,
-    data.raw ?? null,
-    data.error ?? null,
-    data.help ? 1 : 0,
-    data.inputTokens ?? 0,
-    data.outputTokens ?? 0
+    [sessionId, data.turnIndex, data.query, data.summary ?? null, data.quotes ?? null, data.sources ?? null, data.raw ?? null, data.error ?? null, data.help ? 1 : 0, data.inputTokens ?? 0, data.outputTokens ?? 0]
   );
 }
 
@@ -147,9 +135,7 @@ export function updateSessionProvider(provider: string, model: string): void {
   if (!db || currentSessionId === null) return;
   db.run(
     "UPDATE sessions SET provider = ?, model = ?, updated_at = datetime('now') WHERE id = ?",
-    provider,
-    model,
-    currentSessionId
+    [provider, model, currentSessionId]
   );
 }
 
