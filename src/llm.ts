@@ -65,11 +65,7 @@ export function createLLM(config: LLMConfig): any {
 }
 
 export function getDefaultProvider(): ProviderName {
-  const provider = process.env.DEFAULT_PROVIDER;
-  if (provider === "openai" || provider === "anthropic" || provider === "google") {
-    return provider;
-  }
-  return "openai"
+  return "openai";
 }
 
 export function isValidProvider(name: string): name is ProviderName {

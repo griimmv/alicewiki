@@ -6,28 +6,41 @@ Terminal AI Chatbot that fetches Wikipedia articles through the Wikipedia REST A
 
 ```
 src/
-├── index.ts          # Entry point. Routes to one-liner mode (CLI args) or interactive mode (TUI).
+├── index.ts          # Entry point. Initializes SQLite (initDB), routes to
+│                       one-liner (CLI args) or interactive TUI.
 ├── tui.tsx           # React root via @opentui/react. Full-screen TUI with sidebar, header,
-│                     # scrollable messages, input bar, keybinding hints, and token tracking.
-├── one-liner.ts      # Bypasses the LLM: fetches Wikipedia directly, prints title, extract, and URL.
-├── llm.ts            # Builds and routes LLM models to their API keys.
-├── agent.ts          # Agent orchestrator: runs LLM with tool calling (max 2 loops),
-│                     # parses structured JSON output, returns token usage metadata.
+│                       scrollable messages, input bar, keybinding hints, token tracking,
+│                       persistent sessions (saveTurn), and setup modal (SetupModal).
+├── one-liner.ts      # Bypasses the LLM: extracts topic, invokes wikipediaTool.func(),
+│                       parses result, prints title, extract, and URL.
+├── llm.ts            # Builds LangChain ChatModels per provider (openai/anthropic/google).
+│                       Reads API keys from SQLite via getCredential() instead of env vars.
+├── agent.ts          # Agent orchestrator: manual tool-calling loop (max 2), invokes LLM
+│                       with system prompt + conversation history, parses JSON output,
+│                       returns { content, tokens }.
+├── db.ts             # SQLite database (bun:sqlite) for credentials, sessions, and turn history.
+│                       Tables: credentials, sessions, turns. Stores API keys at rest in ~/.alicewiki/.
 ├── components/
 │   ├── Header.tsx        # ASCII art logo + current provider name in a heavy-bordered box.
 │   ├── Sidebar.tsx       # Session stats (queries, articles, token count), fetched articles list,
-│   │                     # and keybinding hints. Stateless — receives all data as props.
-│   ├── Messages.tsx      # ScrollBox container mapping over message turns.
-│   ├── MessageTurn.tsx   # Renders one user+assistant exchange. User query in rounded box,
-│   │                     # response with summary/quotes/sources in bordered boxes. Sequential
-│   │                     # typewriter animation via onComplete callbacks.
-│   ├── InputBar.tsx      # InputRenderable + status line (provider · model). Remounts on
-│   │                     # Alt+D to regain focus. Detaches onSubmit handler during
-│   │                     # processing (input guard) so users cannot spam queries.
+│   │                       and keybinding hints. Stateless — receives all data as props.
+│   ├── Messages.tsx      # ScrollBox container with sticky-scroll mapping over message turns.
+│   ├── MessageTurn.tsx   # Renders one user+assistant exchange. User query in rounded box with
+│   │                       spinner; response with summary/quotes/sources in bordered boxes;
+│   │                       error in red box; help in green box. Sequential typewriter
+│   │                       animation via onComplete callbacks.
+│   ├── InputBar.tsx      # <input> + status line (provider · model). Remounts on Alt+D to
+│   │                       regain focus. Detaches onSubmit during processing (input guard).
+│   ├── SetupModal.tsx    # Full-screen overlay modal for entering API keys at runtime.
+│   │                       Shows provider info, link to key page, and a MaskedInput field.
+│   │                       Escape to dismiss, Enter to save — persisted via setCredential().
+│   ├── MaskedInput.tsx   # Reusable masked text input showing • characters. Supports paste
+│   │                       via usePaste (decodePasteBytes), backspace, Escape, and Enter.
 │   └── TypewriterText.tsx # Char-by-char text reveal via useState + useEffect interval
-│                         # (15ms summary, 10ms quotes/sources). Replaces imperative typeText().
+│                            (15ms summary, 10ms quotes/sources).
 └── tools/
-    └── wikipedia.ts    # Wikipedia tool using the `wikipedia` npm package, outputs JSON.
+    └── wikipedia.ts    # Wikipedia tool built with @langchain/core/tool() and Zod schema.
+                          Uses the `wikipedia` npm package, returns JSON string.
 ```
 
 ## Flow
@@ -53,19 +66,24 @@ Two modes depending on invocation:
      - **Messages**: `<scrollbox>`, sticky-scroll to bottom, max 50 turns.
      - **InputBar**: `<input>` with placeholder, plus model status line.
 3. **User input**: on Enter, value sent to `handleSubmit()` in App.
-   - Commands (`/help`, `/switch`, `/model`, `/quit`) are handled inline with `return`.
+   - Commands (`/help`, `/switch`, `/model`, `/setKey`, `/quit`) are handled inline with `return`.
    - Responses to `/help`, `/switch`, and `/model` render in a green-bordered `HELP` box.
+   - `/setKey <provider>` opens a `SetupModal` overlay for entering an API key via `MaskedInput`.
 4. **Input guard**: while processing, `onSubmit` on the `<input>` is set to `undefined` so Enter does nothing. A yellow-bordered "hold on, alice is still speaking" box floats at the bottom-right of the terminal.
-5. **LLM tool calling** (`agent.ts`): conversation history + system prompt sent to LLM with the wikipedia tool registered. The LLM decides whether to invoke the tool. Runs up to 2 loops.
-6. **Wikipedia fetch**: when the LLM calls the tool, `wikipediaTool` fetches the page and returns structured JSON (`title`, `extract`, `fullContent`, `url`, `thumbnail`).
-7. **LLM synthesis**: the tool result is fed back to the LLM, which produces structured JSON response (`summary`, `quotes`, `sources`).
-8. **Token tracking**: each LLM invocation's `usage_metadata` is accumulated and displayed in the sidebar as `Tokens: N`.
-9. **Output**: rendered inside the TUI as bordered boxes for user query, summary, direct quotes, and sources. Sidebar stats and fetched articles list are updated.
-10. **Animation & release**: typewriter animation reveals the response char-by-char. `isProcessing` stays `true` until the last animation step completes (last source text, or last quote, or summary if no quotes/sources). Then `handleTurnAnimationComplete()` releases the input guard and hides the warning box.
+5. **Lazy agent init**: the agent (`createAgent(createLLM(...))`) is created on the first query, not at startup — so the TUI starts even without a configured API key.
+6. **LLM tool calling** (`agent.ts`): conversation history + system prompt sent to LLM with the wikipedia tool registered. The LLM decides whether to invoke the tool. Runs up to 2 loops.
+7. **Wikipedia fetch**: when the LLM calls the tool, `wikipediaTool` fetches the page and returns structured JSON (`title`, `extract`, `fullContent`, `url`, `thumbnail`).
+8. **LLM synthesis**: the tool result is fed back to the LLM, which produces structured JSON response (`summary`, `quotes`, `sources`). Falls back to raw text if JSON parsing fails.
+9. **Token tracking**: each LLM invocation's `usage_metadata` is accumulated and displayed in the sidebar as `Tokens: N`.
+10. **Output**: rendered inside the TUI as bordered boxes for user query, summary, direct quotes, and sources. Sidebar stats and fetched articles list are updated. A processing spinner animates in the user query box while waiting.
+11. **Persistence**: each turn is saved to SQLite via `saveTurn()` (session ID, query, summary, quotes, sources, tokens, errors). Session is created at startup in `initDB()`.
+12. **Animation & release**: typewriter animation reveals the response char-by-char. `isProcessing` stays `true` until the last animation step completes (last source text, or last quote, or summary if no quotes/sources). Then `handleTurnAnimationComplete()` releases the input guard and hides the warning box. Errors release immediately (no animation).
 
 ## Providers
 
 Configured in `.env` (see `.env.example`). Supported: `openai`, `anthropic`, `google`. Switch at runtime with `/switch <name>`.
+
+API keys are read from the SQLite database (`~/.alicewiki/alicewiki.db`) via `getCredential()` in `llm.ts`. Set keys at runtime with `/setKey <provider>`, which opens a `SetupModal` overlay with a `MaskedInput` (shows ••• characters). Keys are persisted via `setCredential()`.
 
 Default models per provider:
 - `openai` → `gpt-5.4-mini`
@@ -84,6 +102,9 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
 |-----|--------|
 | `Ctrl+B` | Toggle sidebar visibility |
 | `Alt+D` | Focus the input bar |
+| `Ctrl+C` | Quit the application |
+| `Ctrl+click` | Open links |
+| `Escape` | Close setup modal |
 | `/quit` | Exit the application |
 
 ## Tool Details
@@ -92,9 +113,10 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
 
 - **Name**: `wikipedia`
 - **Input**: Object with `query` property (e.g. `{ query: "Python programming language" }`, `{ query: "Mary Sue" }`)
-- **Output**: JSON with `title`, `url`, `extract`, `fullContent`, `thumbnail`, and optional `notification`
+- **Output**: JSON string with `title`, `url`, `extract`, `fullContent`, `thumbnail`, and optional `notification`
 - **Implementation**:
-  - Uses ESM import.
+  - Built with `@langchain/core/tools` `tool()` factory and Zod schema.
+  - Uses `wiki.page(input, { preload: true })` to fetch page data.
   - Fetches both `page.summary()` and `page.content()` in parallel.
   - Full content truncated at 8000 chars with `[...content truncated]` suffix.
   - Falls back to fuzzy search (`wiki.search()`) when direct page lookup fails; appends a `notification` field when using a fuzzy match.
@@ -104,11 +126,15 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
 
 Used in one-liner mode. Strips leading keywords (`who is`, `what is`, `tell me about`, `explain`, `describe`, `the`, `a`, `an`) from the query before passing to Wikipedia.
 
-### `runAgent` (`agent.ts:27`)
+### `runAgent` (`agent.ts:29`)
 
 Agent orchestrator. Sends conversation + system prompt to LLM with the wikipedia tool registered. Supports up to 2 tool-calling loops (reduced from 5 to prevent token waste). Returns `{ content: string; tokens: TokenUsage }` — token usage extracted from `result.usage_metadata` (input/output/total) and accumulated across invocations.
 
-### `TokenUsage` (`agent.ts:1`)
+### `createAgent` (`agent.ts:12`)
+
+Creates a minimal agent object `{ llm, tools: [wikipediaTool] }` — no LangChain AgentExecutor wrapper. The agent is initialized lazily on the first query (not at TUI startup) so the UI loads even without a configured API key.
+
+### `TokenUsage` (`agent.ts:23`)
 
 ```typescript
 interface TokenUsage {
@@ -119,6 +145,10 @@ interface TokenUsage {
 ```
 
 Returned alongside each `runAgent()` call. Accumulated across all loop iterations and displayed in the sidebar as `Tokens: N`.
+
+### JSON parsing (`agent.ts:91`)
+
+The helper `parseJSONFromText()` extracts JSON from LLM responses, supporting both raw JSON and code-fenced (` ```json `) formats. If neither the LLM response nor the manual loop produces valid JSON, a fallback `{ summary, quotes: [], sources: [] }` shape is returned.
 
 ## Typewriter Animation (`src/components/TypewriterText.tsx`)
 

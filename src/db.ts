@@ -81,7 +81,7 @@ function createTables(): void {
 
 function createSession(): number {
   if (!db) throw new Error("DB not initialized");
-  const provider = process.env.DEFAULT_PROVIDER || "openai";
+  const provider = "openai";
   const result = db.run(
     "INSERT INTO sessions (name, provider, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))",
     ["default", provider]
