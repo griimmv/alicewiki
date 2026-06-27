@@ -14,14 +14,24 @@ export function initDB(): void {
     mkdirSync(DB_DIR, { recursive: true, mode: 0o700 });
   }
 
+  try {
+    chmodSync(DB_DIR, 0o700);
+  } catch {}
+
   db = new Database(DB_PATH);
   db.run("PRAGMA journal_mode = WAL");
 
-  // db security
   try {
-    chmodSync(DB_DIR, 0o700);
     chmodSync(DB_PATH, 0o600);
-  } catch {}
+    for (const ext of ["-wal", "-shm"]) {
+      const sidecar = DB_PATH + ext;
+      if (existsSync(sidecar)) {
+        chmodSync(sidecar, 0o600);
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to set DB file permissions:", (err as Error).message);
+  }
 
   createTables();
   currentSessionId = createSession();
