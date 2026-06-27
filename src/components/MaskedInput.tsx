@@ -30,8 +30,9 @@ export function MaskedInput({ placeholder, textColor, cursorColor, onSubmit, onC
       setValue((prev) => prev.slice(0, -1));
       return;
     }
-    if (key.name && key.name.length === 1) {
-      setValue((prev) => prev + key.name!);
+    
+    if (key.sequence && key.sequence.length === 1) {
+      setValue((prev) => prev + key.sequence);
     }
   });
 
