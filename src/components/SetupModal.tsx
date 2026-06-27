@@ -1,6 +1,7 @@
 import { RGBA } from "@opentui/core";
 import type { ThemeColors } from "../tui.tsx";
 import type { ProviderName } from "../llm.ts";
+import { MaskedInput } from "./MaskedInput.tsx";
 
 const PROVIDER_INFO: Record<ProviderName, { name: string; url: string; placeholder: string }> = {
   openai: { name: "OpenAI", url: "https://platform.openai.com/api-keys", placeholder: "sk-..." },
@@ -35,17 +36,17 @@ export function SetupModal({ visible, provider, colors, isDark, onSave, onClose 
         <text fg={colors.muted}>  Paste your key below and press Enter.</text>
         <text fg={colors.muted}>  Press Escape to cancel.</text>
         <box height={1} />
-        <input
+        <MaskedInput
           placeholder={info.placeholder}
           textColor={colors.text}
           cursorColor={colors.accent}
-          focused={true}
           onSubmit={(value) => {
             const trimmed = value.trim();
             if (trimmed) {
               onSave(provider, trimmed);
             }
           }}
+          onCancel={onClose}
         />
         <box height={1} />
         <text fg={colors.muted}>  This key will be stored in ~/.alicewiki/alicewiki.db</text>
