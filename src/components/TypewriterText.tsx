@@ -7,7 +7,7 @@ interface TypewriterTextProps {
   fg?: string;
 }
 
-export function TypewriterText({ text, speed = 15, onComplete, fg }: TypewriterTextProps) {
+export function TypewriterText({ text, speed = 8, onComplete, fg }: TypewriterTextProps) {
   const [displayed, setDisplayed] = useState("");
   const doneRef = useRef(false);
 
