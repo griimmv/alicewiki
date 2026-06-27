@@ -20,6 +20,7 @@ export function initDB(): void {
 
   db = new Database(DB_PATH);
   db.run("PRAGMA journal_mode = WAL");
+  db.run("PRAGMA foreign_keys = ON"); // enforce FK constraints + ON DELETE CASCADE (deleting parent also deletes child)
 
   try {
     chmodSync(DB_PATH, 0o600);
