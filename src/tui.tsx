@@ -348,6 +348,7 @@ function App({ colors, isDark }: AppProps) {
           isDark={isDark}
           onSave={(provider, key) => {
             setCredential(provider, key);
+            agentRef.current = null;
             setSetupModal({ visible: false, provider: null });
           }}
           onClose={() => setSetupModal({ visible: false, provider: null })}
