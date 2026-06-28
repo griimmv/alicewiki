@@ -3,12 +3,21 @@ import { wikipediaTool } from "./tools/wikipedia.ts";
 const LLM_TIMEOUT = 30000;
 const TOOL_TIMEOUT = 20000;
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+// promise.race (idk what to say here)
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string, signal?: AbortSignal): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   const timeoutPromise = new Promise<T>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
   });
-  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+  const abortPromise = signal && new Promise<T>((_, reject) => {
+    if (signal.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+    const onAbort = () => {
+      signal.removeEventListener('abort', onAbort);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal.addEventListener('abort', onAbort);
+  });
+  return Promise.race([promise, timeoutPromise, ...(abortPromise ? [abortPromise] : [])]).finally(() => clearTimeout(timer));
 }
 
 const SYSTEM_PROMPT = `You are a helpful assistant with access to Wikipedia. When the user asks about factual topics (people, places, history, concepts), use the wikipedia tool to look up the topic. For general chat or simple queries, answer directly.
@@ -87,7 +96,8 @@ export async function runAgent(
           const output: string = await withTimeout(
             tool.func(tc.args),
             TOOL_TIMEOUT,
-            `tool(${tc.name})`
+            `tool(${tc.name})`,
+            signal
           );
           messages.push({ role: "tool", content: output, tool_call_id: tc.id });
         }
