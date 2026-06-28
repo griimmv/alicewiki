@@ -1,6 +1,7 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { getCredential, getSessionProvider } from "./db.ts";
 
 export type ProviderName = "openai" | "anthropic" | "google";
 
@@ -26,9 +27,9 @@ export function createLLM(config: LLMConfig): any {
   // Get API key from each provider
   switch (config.provider) {
     case "openai": {
-      const apiKey = process.env.OPENAI_API_KEY;
+      const apiKey = getCredential("openai");
       if (!apiKey) {
-        throw new Error("OPENAI_API_KEY is not set in .env");
+        throw new Error("OpenAI API key is not set. Use /setKey openai <key> to add it.");
       }
       return new ChatOpenAI({
         model: modelName,
@@ -37,9 +38,9 @@ export function createLLM(config: LLMConfig): any {
       });
     }
     case "anthropic": {
-      const apiKey = process.env.ANTHROPIC_API_KEY;
+      const apiKey = getCredential("anthropic");
       if (!apiKey) {
-        throw new Error("ANTHROPIC_API_KEY is not set in .env");
+        throw new Error("Anthropic API key is not set. Use /setKey anthropic to add it.");
       }
       return new ChatAnthropic({
         model: modelName,
@@ -48,9 +49,9 @@ export function createLLM(config: LLMConfig): any {
       });
     }
     case "google": {
-      const apiKey = process.env.GOOGLE_API_KEY;
+      const apiKey = getCredential("google");
       if (!apiKey) {
-        throw new Error("GOOGLE_API_KEY is not set in .env");
+        throw new Error("Google API key is not set. Use /setKey google to add it.");
       }
       return new ChatGoogleGenerativeAI({
         model: modelName,
@@ -64,11 +65,11 @@ export function createLLM(config: LLMConfig): any {
 }
 
 export function getDefaultProvider(): ProviderName {
-  const provider = process.env.DEFAULT_PROVIDER;
-  if (provider === "openai" || provider === "anthropic" || provider === "google") {
-    return provider;
+  const session = getSessionProvider();
+  if (session && isValidProvider(session.provider)) {
+    return session.provider as ProviderName;
   }
-  return "openai"
+  return "openai";
 }
 
 export function isValidProvider(name: string): name is ProviderName {

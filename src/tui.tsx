@@ -10,6 +10,8 @@ import { Sidebar } from "./components/Sidebar.tsx";
 import { InputBar } from "./components/InputBar.tsx";
 import { Messages } from "./components/Messages.tsx";
 import type { TurnData } from "./components/MessageTurn.tsx";
+import { getCurrentSessionId, saveTurn, updateSessionProvider, setCredential, getSessionProvider } from "./db.ts";
+import { SetupModal } from "./components/SetupModal.tsx";
 
 export interface ThemeColors {
   text: string;
@@ -43,7 +45,7 @@ export function getThemeColors(isDark: boolean): ThemeColors {
     : { text: "#1a1b26", muted: "#9aa0b0", accent: "#2e4a8a", border: "#c8ccd4", source: "#383c5a", quote: "#c89a3c" };
 }
 
-// Parse LLM response and validate it matches the expected ParsedResponse shape
+// Parse LLM response and validate if it matches the expected ParsedResponse shape
 export function parseJSONResponse(response: string): ParsedResponse | null {
   try {
     let jsonStr = response.trim();
@@ -80,7 +82,7 @@ Keybindings:
 `;
 
 const MAX_TURNS = 50;
-const WELCOME_TEXT = "  Welcome to AliceWiki! A place where you can go deep dive into a topic using Wikipedia API as the source. \n  Start asking question on the input box below \n\n  Have fun deep diving! or should i call it.. Down the rabbit hole!";
+const WELCOME_TEXT = "  Welcome to AliceWiki! A place where you can go deep dive into a topic using Wikipedia as the source. \n  Start asking question on the input box below \n\n  Have fun deep diving! or should i call it.. Down the rabbit hole!";
 
 interface AppProps {
   colors: ThemeColors;
@@ -90,7 +92,10 @@ interface AppProps {
 function App({ colors, isDark }: AppProps) {
   const renderer = useRenderer();
   const [currentProvider, setCurrentProvider] = useState<ProviderName>(getDefaultProvider());
-  const [currentModel, setCurrentModel] = useState(DEFAULT_MODELS[getDefaultProvider()]);
+  const [currentModel, setCurrentModel] = useState(() => {
+    const session = getSessionProvider();
+    return session?.model ?? DEFAULT_MODELS[currentProvider];
+  });
   const [isProcessing, setIsProcessing] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [messages, setMessages] = useState<TurnData[]>([{ id: "welcome", query: "", raw: WELCOME_TEXT }]);
@@ -100,10 +105,14 @@ function App({ colors, isDark }: AppProps) {
   const [totalTokens, setTotalTokens] = useState(0);
   const [inputKey, setInputKey] = useState(0);
 
-  const agentRef = useRef(createAgent(createLLM({ provider: getDefaultProvider() })));
+  const agentRef = useRef<any>(null);
   const conversationHistoryRef = useRef<any[]>([]);
   const articleCacheRef = useRef<Set<string>>(new Set());
   const isProcessingRef = useRef(false);
+  const turnIndexRef = useRef(0); // sequential turn number used when saving turns/messageTurn(s) to SQLite
+  const [setupModal, setSetupModal] = useState<{ visible: boolean; provider: ProviderName | null }>({ visible: false, provider: null });
+  const setupModalRef = useRef(setupModal);
+  setupModalRef.current = setupModal;
 
   useSelectionHandler((selection) => {
     const text = selection.getSelectedText();
@@ -113,6 +122,10 @@ function App({ colors, isDark }: AppProps) {
   });
 
   useKeyboard((key: KeyEvent) => {
+    if (key.name === "escape" && setupModalRef.current.visible) {
+      setSetupModal({ visible: false, provider: null });
+      return;
+    }
     if (key.meta && key.name === "d") {
       setInputKey((k) => k + 1);
     }
@@ -151,19 +164,25 @@ function App({ colors, isDark }: AppProps) {
         return;
       }
       const provider = parts[1].toLowerCase() as ProviderName;
-      try {
-        const newLLM = createLLM({ provider });
-        const newAgent = createAgent(newLLM);
-        setCurrentProvider(provider);
-        setCurrentModel(DEFAULT_MODELS[provider]);
-        agentRef.current = newAgent;
-        conversationHistoryRef.current = [];
+      setCurrentProvider(provider);
+      setCurrentModel(DEFAULT_MODELS[provider]);
+      agentRef.current = null;
+      conversationHistoryRef.current = [];
+      const id = crypto.randomUUID();
+      setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched to ${provider} (model: ${DEFAULT_MODELS[provider]})`, help: true }]);
+      updateSessionProvider(provider, DEFAULT_MODELS[provider]);
+      return;
+    }
+
+    if (trimmed.startsWith("/setKey")) {
+      const parts = trimmed.split(/\s+/);
+      if (parts.length < 2 || !isValidProvider(parts[1])) {
         const id = crypto.randomUUID();
-        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched to ${provider} (model: ${DEFAULT_MODELS[provider]})`, help: true }]);
-      } catch (err) {
-        const id = crypto.randomUUID();
-        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Error: ${(err as Error).message}`, error: (err as Error).message }]);
+        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: "  Usage: /setKey <provider>\n  Providers: openai, anthropic, google", help: true }]);
+        return;
       }
+      const provider = parts[1].toLowerCase() as ProviderName;
+      setSetupModal({ visible: true, provider });
       return;
     }
 
@@ -180,22 +199,27 @@ function App({ colors, isDark }: AppProps) {
         setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Unknown model "${modelName}" for ${currentProvider}.\n  Known models: ${KNOWN_MODELS[currentProvider].join(", ")}`, help: true }]);
         return;
       }
-      try {
-        const newLLM = createLLM({ provider: currentProvider, modelName });
-        const newAgent = createAgent(newLLM);
-        setCurrentModel(modelName);
-        agentRef.current = newAgent;
-        conversationHistoryRef.current = [];
-        const id = crypto.randomUUID();
-        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched model to ${modelName}`, help: true }]);
-      } catch (err) {
-        const id = crypto.randomUUID();
-        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Error: ${(err as Error).message}`, error: (err as Error).message }]);
-      }
+      setCurrentModel(modelName);
+      agentRef.current = null;
+      conversationHistoryRef.current = [];
+      const id = crypto.randomUUID();
+      setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched model to ${modelName}`, help: true }]);
+      updateSessionProvider(currentProvider, modelName);
       return;
     }
 
     setInputKey((k) => k + 1);
+
+    // init agent lazily so the TUI starts even without a configured API key
+    if (!agentRef.current) {
+      try {
+        agentRef.current = createAgent(createLLM({ provider: currentProvider, modelName: currentModel }));
+      } catch (err) {
+        const id = crypto.randomUUID();
+        setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: trimmed, error: (err as Error).message }]);
+        return;
+      }
+    }
 
     isProcessingRef.current = true;
     setIsProcessing(true);
@@ -209,6 +233,7 @@ function App({ colors, isDark }: AppProps) {
         setTotalTokens((prev) => prev + tokens.total);
         const parsed = parseJSONResponse(response);
         setQueryCount((prev) => prev + 1);
+
         if (parsed) {
           setMessages((prev) =>
             prev.map((t) =>
@@ -225,6 +250,20 @@ function App({ colors, isDark }: AppProps) {
             }
             setArticleFetchCount((prev) => prev + 1);
           }
+          // persist structured LLM response (summary, quotes, sources) to the current session
+          const sessionId = getCurrentSessionId();
+          if (sessionId !== null) {
+            turnIndexRef.current += 1;
+            saveTurn(sessionId, {
+              query: trimmed,
+              turnIndex: turnIndexRef.current,
+              summary: parsed.summary,
+              quotes: JSON.stringify(parsed.quotes),
+              sources: JSON.stringify(parsed.sources),
+              inputTokens: tokens.input,
+              outputTokens: tokens.output,
+            });
+          }
         } else {
           setMessages((prev) =>
             prev.map((t) =>
@@ -233,6 +272,18 @@ function App({ colors, isDark }: AppProps) {
                 : t
             )
           );
+          // persist raw unparsed LLM response to the current session
+          const sessionId = getCurrentSessionId();
+          if (sessionId !== null) {
+            turnIndexRef.current += 1;
+            saveTurn(sessionId, {
+              query: trimmed,
+              turnIndex: turnIndexRef.current,
+              raw: response,
+              inputTokens: tokens.input,
+              outputTokens: tokens.output,
+            });
+          }
         }
         conversationHistoryRef.current.push({ role: "user", content: trimmed });
         conversationHistoryRef.current.push({ role: "assistant", content: response });
@@ -248,6 +299,16 @@ function App({ colors, isDark }: AppProps) {
               : t
           )
         );
+        // persist failed turn to the current session so errors aren't lost
+        const sessionId = getCurrentSessionId();
+        if (sessionId !== null) {
+          turnIndexRef.current += 1;
+          saveTurn(sessionId, {
+            query: trimmed,
+            turnIndex: turnIndexRef.current,
+            error: (err as Error).message,
+          });
+        }
         // errors have no typewriter animation — release immediately
         handleTurnAnimationComplete();
       })
@@ -277,14 +338,24 @@ function App({ colors, isDark }: AppProps) {
           currentProvider={currentProvider}
           currentModel={currentModel}
           isProcessing={isProcessing}
+          isFocused={!setupModal.visible}
           onSubmit={handleSubmit}
           inputKey={inputKey}
         />
       </box>
-      {isProcessing && (
-        <box position="absolute" bottom={0} right={0} borderStyle="single" borderColor="#e0af68" paddingLeft={1} paddingRight={1}>
-          <text fg="#e0af68">hold on, alice is still speaking</text>
-        </box>
+      {setupModal.visible && setupModal.provider && (
+        <SetupModal
+          visible={true}
+          provider={setupModal.provider}
+          colors={colors}
+          isDark={isDark}
+          onSave={(provider, key) => {
+            setCredential(provider, key);
+            agentRef.current = null;
+            setSetupModal({ visible: false, provider: null });
+          }}
+          onClose={() => setSetupModal({ visible: false, provider: null })}
+        />
       )}
     </box>
   );

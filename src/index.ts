@@ -1,11 +1,10 @@
 #!/usr/bin/env bun
-import { config } from "dotenv";
-import { resolve } from "path";
+import { initDB } from "./db.ts";
 import { runOneLiner } from "./one-liner.ts";
 import { startTUI } from "./tui.tsx";
 
 async function main() {
-  config({ path: resolve(import.meta.dir, "../.env") });
+  initDB();
 
   const args = process.argv.slice(2);
 

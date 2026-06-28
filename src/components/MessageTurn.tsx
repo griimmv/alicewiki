@@ -124,7 +124,7 @@ export function MessageTurn({ turn, colors, onAnimationComplete }: MessageTurnPr
         <>
           <box borderStyle="rounded" borderColor={colors.accent} padding={1} width="100%" flexDirection="column">
             <text fg={colors.accent}><b>  SUMMARY</b></text>
-            <TypewriterText text={`  ${turn.summary ?? ""}`} speed={15} onComplete={onSummaryDone} fg={colors.text} />
+            <TypewriterText text={`  ${turn.summary ?? ""}`} speed={8} onComplete={onSummaryDone} fg={colors.text} />
           </box>
 
           {quotesStage >= 0 && turn.quotes && turn.quotes.length > 0 && (
@@ -135,7 +135,7 @@ export function MessageTurn({ turn, colors, onAnimationComplete }: MessageTurnPr
                   <TypewriterText
                     key={i}
                     text={`  [${i + 1}] "${q.text}"\n       \u2014 ${q.source}\n       ${q.url}`}
-                    speed={10}
+                    speed={5}
                     onComplete={() => onQuoteDone(i)}
                     fg={colors.text}
                   />
@@ -152,7 +152,7 @@ export function MessageTurn({ turn, colors, onAnimationComplete }: MessageTurnPr
                   <TypewriterText
                     key={i}
                     text={`  [${i + 1}] ${s.title}\n       ${s.url}`}
-                    speed={10}
+                    speed={5}
                     onComplete={() => onSourceDone(i)}
                     fg={colors.text}
                   />
@@ -166,12 +166,12 @@ export function MessageTurn({ turn, colors, onAnimationComplete }: MessageTurnPr
       {hasRaw && turn.help && !turn.error && (
         <box borderStyle="single" borderColor="#2ecc71" padding={1} width="100%" flexDirection="column">
           <text fg="#2ecc71"><b>  HELP</b></text>
-          <TypewriterText text={`  ${turn.raw}`} speed={15} onComplete={finishAnimation} fg={colors.text} />
+          <TypewriterText text={`  ${turn.raw}`} speed={8} onComplete={finishAnimation} fg={colors.text} />
         </box>
       )}
 
       {hasRaw && !turn.help && !turn.error && (
-        <TypewriterText text={`  ${turn.raw}`} speed={15} onComplete={finishAnimation} fg={colors.text} />
+        <TypewriterText text={`  ${turn.raw}`} speed={8} onComplete={finishAnimation} fg={colors.text} />
       )}
     </box>
   );
