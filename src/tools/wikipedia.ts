@@ -3,6 +3,16 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
 const MAX_CONTENT_CHARS = 8000;
+const WIKI_TIMEOUT = 15000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
 
 export interface WikiResult {
   title: string;
@@ -11,13 +21,14 @@ export interface WikiResult {
   fullContent?: string;
   thumbnail?: string;
   notification?: string;
+  foundArticle: boolean;
 }
 
 async function fetchPage(input: string): Promise<WikiResult> {
-  const page = await wiki.page(input, { preload: true });
+  const page = await withTimeout(wiki.page(input, { preload: true }), WIKI_TIMEOUT, `wiki.page("${input}")`);
   const [pageSummary, content] = await Promise.all([
-    page.summary(),
-    page.content(),
+    withTimeout(page.summary(), WIKI_TIMEOUT, `page.summary()`),
+    withTimeout(page.content(), WIKI_TIMEOUT, `page.content()`),
   ]);
 
   const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(pageSummary.title.replace(/ /g, '_'))}`;
@@ -32,6 +43,7 @@ async function fetchPage(input: string): Promise<WikiResult> {
     extract: pageSummary.extract,
     fullContent: truncated,
     thumbnail: pageSummary.thumbnail?.source,
+    foundArticle: true,
   };
 }
 
@@ -43,15 +55,15 @@ export const wikipediaTool = tool(
       return JSON.stringify(result);
     } catch (error) {
       try {
-        const searchResults = await wiki.search(topic, { limit: 1 });
+        const searchResults = await withTimeout(wiki.search(topic, { limit: 1 }), WIKI_TIMEOUT, `wiki.search("${topic}")`);
         if (searchResults.results.length === 0) {
-          return JSON.stringify({ title: "", url: "", extract: "", fullContent: "", thumbnail: "", notification: `Search failed: ${error instanceof Error ? error.message : "Unknown error"}` });
+          return JSON.stringify({ title: "", url: "", extract: "", fullContent: "", thumbnail: "", foundArticle: false, notification: `No Wikipedia article found for "${topic}"` });
         }
         const result = await fetchPage(searchResults.results[0].title);
         result.notification = "  (No title matched the query, using fuzzy finder option that might be inaccurate)";
         return JSON.stringify(result);
       } catch (searchError) {
-        return JSON.stringify({ title: "", url: "", extract: "", fullContent: "", thumbnail: "", notification: `Fallback: ${searchError instanceof Error ? searchError.message : "Unknown error"}` });
+        return JSON.stringify({ title: "", url: "", extract: "", fullContent: "", thumbnail: "", foundArticle: false, notification: `No Wikipedia article found for "${topic}"` });
       }
     }
   },

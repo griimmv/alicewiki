@@ -109,10 +109,15 @@ function App({ colors, isDark }: AppProps) {
   const conversationHistoryRef = useRef<any[]>([]);
   const articleCacheRef = useRef<Set<string>>(new Set());
   const isProcessingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const turnIndexRef = useRef(0); // sequential turn number used when saving turns/messageTurn(s) to SQLite
   const [setupModal, setSetupModal] = useState<{ visible: boolean; provider: ProviderName | null }>({ visible: false, provider: null });
   const setupModalRef = useRef(setupModal);
   setupModalRef.current = setupModal;
+
+  useEffect(() => {
+    return () => abortControllerRef.current?.abort();
+  }, []);
 
   useSelectionHandler((selection) => {
     const text = selection.getSelectedText();
@@ -124,6 +129,10 @@ function App({ colors, isDark }: AppProps) {
   useKeyboard((key: KeyEvent) => {
     if (key.name === "escape" && setupModalRef.current.visible) {
       setSetupModal({ visible: false, provider: null });
+      return;
+    }
+    if (key.name === "escape" && isProcessingRef.current) {
+      abortControllerRef.current?.abort();
       return;
     }
     if (key.meta && key.name === "d") {
@@ -224,11 +233,14 @@ function App({ colors, isDark }: AppProps) {
     isProcessingRef.current = true;
     setIsProcessing(true);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const turnId = crypto.randomUUID();
     const turn: TurnData = { id: turnId, query: trimmed, isProcessing: true };
     setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), turn]);
 
-    runAgent(agentRef.current, trimmed, conversationHistoryRef.current)
+    runAgent(agentRef.current, trimmed, conversationHistoryRef.current, controller.signal)
       .then(({ content: response, tokens }) => {
         setTotalTokens((prev) => prev + tokens.total);
         const parsed = parseJSONResponse(response);
@@ -250,7 +262,6 @@ function App({ colors, isDark }: AppProps) {
             }
             setArticleFetchCount((prev) => prev + 1);
           }
-          // persist structured LLM response (summary, quotes, sources) to the current session
           const sessionId = getCurrentSessionId();
           if (sessionId !== null) {
             turnIndexRef.current += 1;
@@ -272,7 +283,6 @@ function App({ colors, isDark }: AppProps) {
                 : t
             )
           );
-          // persist raw unparsed LLM response to the current session
           const sessionId = getCurrentSessionId();
           if (sessionId !== null) {
             turnIndexRef.current += 1;
@@ -291,30 +301,28 @@ function App({ colors, isDark }: AppProps) {
           conversationHistoryRef.current = conversationHistoryRef.current.slice(-20);
         }
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
+        const error = err as Error;
         setMessages((prev) =>
           prev.map((t) =>
             t.id === turnId
-              ? { ...t, isProcessing: false, error: (err as Error).message }
+              ? { ...t, isProcessing: false, error: error.message }
               : t
           )
         );
-        // persist failed turn to the current session so errors aren't lost
         const sessionId = getCurrentSessionId();
         if (sessionId !== null) {
           turnIndexRef.current += 1;
           saveTurn(sessionId, {
             query: trimmed,
             turnIndex: turnIndexRef.current,
-            error: (err as Error).message,
+            error: error.message,
           });
         }
-        // errors have no typewriter animation — release immediately
         handleTurnAnimationComplete();
       })
       .finally(() => {
-        // isProcessing stays true until MessageTurn finishes its
-        // typewriter animation and calls handleTurnAnimationComplete()
+        abortControllerRef.current = null;
       });
   }
 
