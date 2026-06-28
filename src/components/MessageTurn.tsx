@@ -99,16 +99,16 @@ export function MessageTurn({ turn, colors, onAnimationComplete }: MessageTurnPr
       {turn.query && (
         <box
           borderStyle="rounded"
-          borderColor={colors.border}
+          borderColor={isSpinning ? colors.accent : colors.border}
           padding={1}
           width="100%"
           flexDirection="column"
-          bottomTitle={isSpinning ? " Thinking " : undefined}
+          bottomTitle={isSpinning ? " Fetching article " : undefined}
         >
           <text fg={colors.muted}><b>  You</b></text>
           <text fg={colors.text} selectable>  {turn.query}</text>
           {isSpinning && (
-            <text fg={colors.muted}>  <Spinner /></text>
+            <text fg={colors.accent}>  <Spinner /></text>
           )}
         </box>
       )}
