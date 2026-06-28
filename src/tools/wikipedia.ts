@@ -62,7 +62,11 @@ export const wikipediaTool = tool(
         result.notification = "  (No title matched the query, using fuzzy finder option that might be inaccurate)";
         return JSON.stringify(result);
       } catch (searchError) {
-        return JSON.stringify({ title: "", url: "", extract: "", fullContent: "", thumbnail: "", foundArticle: false, notification: `No Wikipedia article found for "${topic}"` });
+        const msg = searchError instanceof Error ? searchError.message : "Unknown error";
+        const notification = msg.includes("timed out")
+          ? `Wikipedia search timed out for "${topic}". Please try again.`
+          : `Wikipedia search failed for "${topic}": ${msg}`;
+        return JSON.stringify({ title: "", url: "", extract: "", fullContent: "", thumbnail: "", foundArticle: false, notification });
       }
     }
   },
