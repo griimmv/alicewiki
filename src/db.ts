@@ -81,16 +81,26 @@ function createTables(): void {
 
 function createSession(): number {
   if (!db) throw new Error("DB not initialized");
-  const provider = "openai";
+  const lastSession = getSessionProvider();
+  const provider = lastSession?.provider ?? "openai";
+  const model = lastSession?.model ?? null;
   const result = db.run(
-    "INSERT INTO sessions (name, provider, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))",
-    ["default", provider]
+    "INSERT INTO sessions (name, provider, model, created_at, updated_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))",
+    ["default", provider, model]
   );
   return Number(result.lastInsertRowid);
 }
 
 export function getCurrentSessionId(): number | null {
   return currentSessionId;
+}
+
+export function getSessionProvider(): { provider: string; model: string | null } | null {
+  if (!db) return null;
+  const row = db.query(
+    "SELECT provider, model FROM sessions ORDER BY id DESC LIMIT 1"
+  ).get() as { provider: string; model: string | null } | null;
+  return row ?? null;
 }
 
 export function getCredential(provider: string): string | null {
