@@ -37,7 +37,7 @@ src/
 │   ├── MaskedInput.tsx   # Reusable masked text input showing • characters. Supports paste
 │   │                       via usePaste (decodePasteBytes), backspace, Escape, and Enter.
 │   └── TypewriterText.tsx # Char-by-char text reveal via useState + useEffect interval
-│                            (15ms summary, 10ms quotes/sources).
+│                            (8ms summary, 5ms quotes/sources).
 └── tools/
     └── wikipedia.ts    # Wikipedia tool built with @langchain/core/tool() and Zod schema.
                           Uses the `wikipedia` npm package, returns JSON string.
@@ -81,7 +81,7 @@ Two modes depending on invocation:
 
 ## Providers
 
-Configured in `.env` (see `.env.example`). Supported: `openai`, `anthropic`, `google`. Switch at runtime with `/switch <name>`.
+Supported: `openai`, `anthropic`, `google`. Switch at runtime with `/switch <name>`. Provider and model preferences persist across sessions via SQLite.
 
 API keys are read from the SQLite database (`~/.alicewiki/alicewiki.db`) via `getCredential()` in `llm.ts`. Set keys at runtime with `/setKey <provider>`, which opens a `SetupModal` overlay with a `MaskedInput` (shows ••• characters). Keys are persisted via `setCredential()`.
 
@@ -161,7 +161,7 @@ function TypewriterText({ text, speed, onComplete, fg })
 ```
 
 - Uses `useState` for the revealed substring
-- `useEffect` with `setInterval` (speed ms) increments characters
+- `useEffect` with `setInterval` (speed ms, default 8) increments characters
 - Calls `onComplete` once when full text is revealed
 - `doneRef` prevents double-fires on re-render
 - No `renderer.requestLive()/dropLive()` — React reconciler handles frame updates
@@ -170,9 +170,9 @@ function TypewriterText({ text, speed, onComplete, fg })
 
 | Step | Content | Speed | Trigger |
 |------|---------|-------|--------|
-| 1 | Summary text | 15ms/char | On mount (immediate) |
-| 2 | Direct Quotes (each) | 10ms/char | `onSummaryDone` → 200ms delay |
-| 3 | Sources (each) | 10ms/char | Last quote done → 200ms delay |
+| 1 | Summary text | 8ms/char | On mount (immediate) |
+| 2 | Direct Quotes (each) | 5ms/char | `onSummaryDone` → 200ms delay |
+| 3 | Sources (each) | 5ms/char | Last quote done → 200ms delay |
 
 The layout (bordered summary/quotes/sources boxes with labels) renders immediately — only the content text animates. `isProcessing` stays `true` during animation so the user cannot submit new input until the full response is revealed. The fallback path (unparseable JSON) also uses `<TypewriterText>` for consistency.
 
@@ -192,3 +192,4 @@ The input is cleared only on successful non-guarded submits (via `inputKey` remo
 
 - **Resource-efficient**: no browser automation, no heavy frameworks. Single-threaded Node.js process.
 - **Rich TUI**: `@opentui/react` provides a full-screen terminal UI with split-panel layout, scrollable content, theming, React components, and keyboard input handling.
+

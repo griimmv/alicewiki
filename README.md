@@ -16,12 +16,12 @@ bun install -g alicewiki
 
 ## Configuration
 
-API keys are set at runtime inside the TUI with `/setKey <provider>` and stored in `~/.alicewiki/alicewiki.db`.
+API keys are set at runtime inside the TUI with `/setKey <provider>` and stored in `~/.alicewiki/alicewiki.db`. Provider and model preferences persist across sessions automatically.
 
 ## Usage
 
-```bash
-# Interactive TUI mode (requires API key — set via /setKey inside the app)
+```bash 
+# Interactive TUI mode (starts without an API key; run /setKey before your first LLM query)
 aw
 
 # One-liner mode (doesn't need an API key)
@@ -80,7 +80,7 @@ src/
 │   ├── MaskedInput.tsx   # Reusable masked text input showing • characters. Supports paste
 │   │                       via usePaste (decodePasteBytes), backspace, Escape, and Enter.
 │   └── TypewriterText.tsx # Char-by-char text reveal via useState + useEffect interval
-│                            (15ms summary, 10ms quotes/sources).
+│                            (8ms summary, 5ms quotes/sources).
 └── tools/
     └── wikipedia.ts    # Wikipedia tool built with @langchain/core/tool() and Zod schema.
                           Uses the `wikipedia` npm package, returns JSON string.
