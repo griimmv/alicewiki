@@ -10,7 +10,7 @@ import { Sidebar } from "./components/Sidebar.tsx";
 import { InputBar } from "./components/InputBar.tsx";
 import { Messages } from "./components/Messages.tsx";
 import type { TurnData } from "./components/MessageTurn.tsx";
-import { getCurrentSessionId, saveTurn, updateSessionProvider, setCredential } from "./db.ts";
+import { getCurrentSessionId, saveTurn, updateSessionProvider, setCredential, getSessionProvider } from "./db.ts";
 import { SetupModal } from "./components/SetupModal.tsx";
 
 export interface ThemeColors {
@@ -92,7 +92,10 @@ interface AppProps {
 function App({ colors, isDark }: AppProps) {
   const renderer = useRenderer();
   const [currentProvider, setCurrentProvider] = useState<ProviderName>(getDefaultProvider());
-  const [currentModel, setCurrentModel] = useState(DEFAULT_MODELS[getDefaultProvider()]);
+  const [currentModel, setCurrentModel] = useState(() => {
+    const session = getSessionProvider();
+    return session?.model ?? DEFAULT_MODELS[currentProvider];
+  });
   const [isProcessing, setIsProcessing] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [messages, setMessages] = useState<TurnData[]>([{ id: "welcome", query: "", raw: WELCOME_TEXT }]);

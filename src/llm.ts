@@ -1,7 +1,7 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { getCredential } from "./db.ts";
+import { getCredential, getSessionProvider } from "./db.ts";
 
 export type ProviderName = "openai" | "anthropic" | "google";
 
@@ -65,6 +65,10 @@ export function createLLM(config: LLMConfig): any {
 }
 
 export function getDefaultProvider(): ProviderName {
+  const session = getSessionProvider();
+  if (session && isValidProvider(session.provider)) {
+    return session.provider as ProviderName;
+  }
   return "openai";
 }
 
