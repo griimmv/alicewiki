@@ -43,7 +43,7 @@ aw who is mary sue?
 | `Ctrl+B` | Toggle sidebar visibility |
 | `Alt+D` | Focus the input bar |
 | `Ctrl+C` | Quit the application |
-| `Escape` | Close setup modal |
+| `Escape` | Close setup modal / Cancel in-flight LLM request |
 
 ## Architecture
 
@@ -60,7 +60,9 @@ src/
 │                       Reads API keys from SQLite via getCredential() instead of env vars.
 ├── agent.ts          # Agent orchestrator: manual tool-calling loop (max 2), invokes LLM
 │                       with system prompt + conversation history, parses JSON output,
-│                       returns { content, tokens }.
+│                       returns { content, tokens }. Uses LangChain SDK's built-in retry
+│                       logic (no custom retry loop). LLM invoke has 30s timeout,
+│                       tool calls have 20s timeout — both via Promise.race.
 ├── db.ts             # SQLite database (bun:sqlite) for credentials, sessions, and turn history.
 │                       Tables: credentials, sessions, turns. Stores API keys at rest in ~/.alicewiki/.
 ├── components/

@@ -1,5 +1,25 @@
 import { wikipediaTool } from "./tools/wikipedia.ts";
 
+const LLM_TIMEOUT = 30000;
+const TOOL_TIMEOUT = 20000;
+
+// promise.race (idk what to say here)
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string, signal?: AbortSignal): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  const abortPromise = signal && new Promise<T>((_, reject) => {
+    if (signal.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+    const onAbort = () => {
+      signal.removeEventListener('abort', onAbort);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal.addEventListener('abort', onAbort);
+  });
+  return Promise.race([promise, timeoutPromise, ...(abortPromise ? [abortPromise] : [])]).finally(() => clearTimeout(timer));
+}
+
 const SYSTEM_PROMPT = `You are a helpful assistant with access to Wikipedia. When the user asks about factual topics (people, places, history, concepts), use the wikipedia tool to look up the topic. For general chat or simple queries, answer directly.
 
 Respond ONLY with valid JSON matching this schema, no other text:
@@ -25,11 +45,15 @@ export interface TokenUsage {
   output: number;
   total: number;
 }
-
+// little side note (idk if this is important or not) i decided to use Langchain's 
+// retry loop for simplicity, i tried making one (well, my agent made it) but i'm
+// afraid its going to be too spaghetti with keyword matching as the main indicator 
+// for retrying or not. idk if there is another simpler way to do it.
 export async function runAgent(
   agent: any,
   input: string,
-  history: any[] = []
+  history: any[] = [],
+  signal?: AbortSignal
 ): Promise<{ content: string; tokens: TokenUsage }> {
   const messages: any[] = [...history, { role: "user", content: input }];
   const maxLoops = 2;
@@ -37,9 +61,13 @@ export async function runAgent(
 
   // infinite loop safeguard for llm to prevent token wasted on unnecessary tasks
   for (let i = 0; i < maxLoops; i++) {
-    const result = await agent.llm.invoke(
-      [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-      { tools: agent.tools }
+    const result: any = await withTimeout(
+      agent.llm.invoke(
+        [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        { tools: agent.tools, signal }
+      ),
+      LLM_TIMEOUT,
+      "LLM invoke"
     );
 
     if (result.usage_metadata) {
@@ -65,7 +93,12 @@ export async function runAgent(
       for (const tc of result.tool_calls) {
         const tool = agent.tools.find((t: any) => t.name === tc.name);
         if (tool) {
-          const output = await tool.func(tc.args);
+          const output: string = await withTimeout(
+            tool.func(tc.args),
+            TOOL_TIMEOUT,
+            `tool(${tc.name})`,
+            signal
+          );
           messages.push({ role: "tool", content: output, tool_call_id: tc.id });
         }
       }
