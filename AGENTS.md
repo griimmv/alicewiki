@@ -17,7 +17,9 @@ src/
 │                       Reads API keys from SQLite via getCredential() instead of env vars.
 ├── agent.ts          # Agent orchestrator: manual tool-calling loop (max 2), invokes LLM
 │                       with system prompt + conversation history, parses JSON output,
-│                       returns { content, tokens }.
+│                       returns { content, tokens }. Uses LangChain SDK's built-in retry
+│                       logic (no custom retry loop). LLM invoke has 30s timeout,
+│                       tool calls have 20s timeout — both via Promise.race.
 ├── db.ts             # SQLite database (bun:sqlite) for credentials, sessions, and turn history.
 │                       Tables: credentials, sessions, turns. Stores API keys at rest in ~/.alicewiki/.
 ├── components/
@@ -69,7 +71,7 @@ Two modes depending on invocation:
    - Commands (`/help`, `/switch`, `/model`, `/setKey`, `/quit`) are handled inline with `return`.
    - Responses to `/help`, `/switch`, and `/model` render in a green-bordered `HELP` box.
    - `/setKey <provider>` opens a `SetupModal` overlay for entering an API key via `MaskedInput`.
-4. **Input guard**: while processing, `onSubmit` on the `<input>` is set to `undefined` so Enter does nothing. A yellow-bordered "hold on, alice is still speaking" box floats at the bottom-right of the terminal.
+4. **Input guard**: while processing, `onSubmit` on the `<input>` is set to `undefined` so Enter does nothing. Press `Escape` during processing to abort the in-flight LLM request instantly via `AbortController`.
 5. **Lazy agent init**: the agent (`createAgent(createLLM(...))`) is created on the first query, not at startup — so the TUI starts even without a configured API key.
 6. **LLM tool calling** (`agent.ts`): conversation history + system prompt sent to LLM with the wikipedia tool registered. The LLM decides whether to invoke the tool. Runs up to 2 loops.
 7. **Wikipedia fetch**: when the LLM calls the tool, `wikipediaTool` fetches the page and returns structured JSON (`title`, `extract`, `fullContent`, `url`, `thumbnail`).
@@ -104,7 +106,7 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
 | `Alt+D` | Focus the input bar |
 | `Ctrl+C` | Quit the application |
 | `Ctrl+click` | Open links |
-| `Escape` | Close setup modal |
+| `Escape` | Close setup modal / Cancel in-flight LLM request |
 | `/quit` | Exit the application |
 
 ## Tool Details
@@ -122,13 +124,17 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
   - Falls back to fuzzy search (`wiki.search()`) when direct page lookup fails; appends a `notification` field when using a fuzzy match.
 - Uses the `wikipedia` npm package for API access.
 
+- All Wikipedia API calls (`wiki.page()`, `page.summary()`, `page.content()`, `wiki.search()`) are wrapped with a 15s timeout via `Promise.race`.
+
 ### `extractWikiTopic` (`agent.ts:16`)
 
 Used in one-liner mode. Strips leading keywords (`who is`, `what is`, `tell me about`, `explain`, `describe`, `the`, `a`, `an`) from the query before passing to Wikipedia.
 
-### `runAgent` (`agent.ts:29`)
+### `runAgent` (`agent.ts:40`)
 
 Agent orchestrator. Sends conversation + system prompt to LLM with the wikipedia tool registered. Supports up to 2 tool-calling loops (reduced from 5 to prevent token waste). Returns `{ content: string; tokens: TokenUsage }` — token usage extracted from `result.usage_metadata` (input/output/total) and accumulated across invocations.
+
+Retries are handled by the LangChain SDK's built-in logic (no custom retry loop). Each LLM invoke has a 30s outer timeout via `Promise.race`; tool calls have a 20s outer timeout. An optional `AbortSignal` can be passed through to allow instant cancellation (used by Escape in the TUI).
 
 ### `createAgent` (`agent.ts:12`)
 
@@ -178,13 +184,13 @@ The layout (bordered summary/quotes/sources boxes with labels) renders immediate
 
 ### `isProcessing` lifecycle
 
-| Phase | `isProcessing` | Input bar | Warning box |
-|-------|---------------|-----------|-------------|
-| Idle | `false` | `onSubmit` attached, Enter works | Hidden |
-| Submit → LLM fetches | `true` | `onSubmit` detached, Enter does nothing | Visible |
-| LLM response → typewriter animation | `true` | `onSubmit` detached | Visible |
-| Animation complete | `false` | `onSubmit` reattached | Hidden |
-| Error (no animation) | `false` via `.catch()` | `onSubmit` reattached | Hidden |
+| Phase | `isProcessing` | Input bar |
+|-------|---------------|-----------|
+| Idle | `false` | `onSubmit` attached, Enter works |
+| Submit → LLM fetches | `true` | `onSubmit` detached, Enter does nothing |
+| LLM response → typewriter animation | `true` | `onSubmit` detached |
+| Animation complete | `false` | `onSubmit` reattached |
+| Error (no animation) | `false` via `.catch()` | `onSubmit` reattached |
 
 The input is cleared only on successful non-guarded submits (via `inputKey` remount). During processing, typed text accumulates and is preserved.
 
