@@ -9,29 +9,34 @@ const DB_PATH = join(DB_DIR, "alicewiki.db");
 let db: Database | null = null;
 let currentSessionId: number | null = null;
 
-export function initDB(): void {
-  if (!existsSync(DB_DIR)) {
-    mkdirSync(DB_DIR, { recursive: true, mode: 0o700 });
+export function initDB(dbPath?: string): void {
+  const dbFile = dbPath ?? DB_PATH;
+
+  if (!dbPath) {
+    if (!existsSync(DB_DIR)) {
+      mkdirSync(DB_DIR, { recursive: true, mode: 0o700 });
+    }
+    try {
+      chmodSync(DB_DIR, 0o700);
+    } catch {}
   }
 
-  try {
-    chmodSync(DB_DIR, 0o700);
-  } catch {}
-
-  db = new Database(DB_PATH);
+  db = new Database(dbFile);
   db.run("PRAGMA journal_mode = WAL");
-  db.run("PRAGMA foreign_keys = ON"); // enforce FK constraints + ON DELETE CASCADE (deleting parent also deletes child)
+  db.run("PRAGMA foreign_keys = ON");
 
-  try {
-    chmodSync(DB_PATH, 0o600);
-    for (const ext of ["-wal", "-shm"]) {
-      const sidecar = DB_PATH + ext;
-      if (existsSync(sidecar)) {
-        chmodSync(sidecar, 0o600);
+  if (!dbPath) {
+    try {
+      chmodSync(dbFile, 0o600);
+      for (const ext of ["-wal", "-shm"]) {
+        const sidecar = dbFile + ext;
+        if (existsSync(sidecar)) {
+          chmodSync(sidecar, 0o600);
+        }
       }
+    } catch (err) {
+      console.warn("Failed to set DB file permissions:", (err as Error).message);
     }
-  } catch (err) {
-    console.warn("Failed to set DB file permissions:", (err as Error).message);
   }
 
   createTables();
