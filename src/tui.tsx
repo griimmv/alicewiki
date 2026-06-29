@@ -10,8 +10,10 @@ import { Sidebar } from "./components/Sidebar.tsx";
 import { InputBar } from "./components/InputBar.tsx";
 import { Messages } from "./components/Messages.tsx";
 import type { TurnData } from "./components/MessageTurn.tsx";
-import { getCurrentSessionId, saveTurn, updateSessionProvider, setCredential, getSessionProvider } from "./db.ts";
+import { getCurrentSessionId, saveTurn, updateSessionProvider, setCredential, getSessionProvider, createSession, listSessions, switchSession, renameSession, deleteSession, getSessionTurns } from "./db.ts";
+import type { SessionInfo, SessionTurn } from "./db.ts";
 import { SetupModal } from "./components/SetupModal.tsx";
+import { SessionModal } from "./components/SessionModal.tsx";
 
 export interface ThemeColors {
   text: string;
@@ -70,6 +72,7 @@ export function parseJSONResponse(response: string): ParsedResponse | null {
 const HELP_TEXT = `
 Commands:
   /help                 Show this help message
+  /sessions             Open session manager
   /switch <provider>    Switch LLM provider (openai, anthropic, google)
   /model <name>         Change model for current provider
   /quit                 Exit the application
@@ -114,8 +117,13 @@ function App({ colors, isDark }: AppProps) {
   const [setupModal, setSetupModal] = useState<{ visible: boolean; provider: ProviderName | null }>({ visible: false, provider: null });
   const setupModalRef = useRef(setupModal);
   setupModalRef.current = setupModal;
+  const [sessionModal, setSessionModal] = useState(false);
+  const [sessionsList, setSessionsList] = useState<SessionInfo[]>([]);
+  const sessionModalRef = useRef(sessionModal);
+  sessionModalRef.current = sessionModal;
 
   useEffect(() => {
+    setSessionsList(listSessions());
     return () => abortControllerRef.current?.abort();
   }, []);
 
@@ -129,6 +137,10 @@ function App({ colors, isDark }: AppProps) {
   useKeyboard((key: KeyEvent) => {
     if (key.name === "escape" && setupModalRef.current.visible) {
       setSetupModal({ visible: false, provider: null });
+      return;
+    }
+    if (key.name === "escape" && sessionModalRef.current) {
+      setSessionModal(false);
       return;
     }
     if (key.name === "escape" && isProcessingRef.current) {
@@ -146,6 +158,123 @@ function App({ colors, isDark }: AppProps) {
   function handleTurnAnimationComplete() {
     isProcessingRef.current = false;
     setIsProcessing(false);
+  }
+
+  function refreshSessionsList() {
+    setSessionsList(listSessions());
+  }
+
+  function handleSessionSwitch(id: number) {
+    const session = switchSession(id);
+    if (!session) return;
+
+    const newProvider = session.provider as ProviderName;
+    const newModel = session.model ?? DEFAULT_MODELS[newProvider];
+    // Avoid recreating agent when provider/model haven't changed
+    if (newProvider !== currentProvider || newModel !== currentModel) {
+      agentRef.current = null;
+    }
+    setCurrentProvider(newProvider);
+    setCurrentModel(newModel);
+
+    const rawTurns = getSessionTurns(id);
+    const loadedTurns: TurnData[] = rawTurns.map((t: SessionTurn) => ({
+      id: `turn-${t.id}`,
+      query: t.query,
+      summary: t.summary ?? undefined,
+      quotes: t.quotes ? (JSON.parse(t.quotes) as Quote[]) : undefined,
+      sources: t.sources ? (JSON.parse(t.sources) as Source[]) : undefined,
+      raw: t.raw ?? undefined,
+      error: t.error ?? undefined,
+      help: t.help === 1,
+    }));
+    setMessages(loadedTurns.length > 0 ? loadedTurns : [{ id: "welcome", query: "", raw: WELCOME_TEXT }]);
+
+    // Reconstruct conversation history from DB so the agent has context on next query
+    const history: { role: string; content: string }[] = [];
+    for (const t of rawTurns) {
+      if (t.error || !t.query) continue;
+      history.push({ role: "user", content: t.query });
+      // Use raw (unparseable) response, or reconstruct JSON from stored summary/quotes/sources
+      if (t.raw) {
+        history.push({ role: "assistant", content: t.raw });
+      } else if (t.summary) {
+        history.push({
+          role: "assistant",
+          content: JSON.stringify({
+            summary: t.summary,
+            quotes: t.quotes ? JSON.parse(t.quotes) : [],
+            sources: t.sources ? JSON.parse(t.sources) : [],
+          }),
+        });
+      }
+    }
+    conversationHistoryRef.current = history;
+    turnIndexRef.current = rawTurns.length;
+    setQueryCount(rawTurns.filter((t) => t.query).length);
+    const articleSet = new Set<string>();
+    let articleCount = 0;
+    for (const t of rawTurns) {
+      if (t.sources) {
+        const parsed = JSON.parse(t.sources) as Source[];
+        if (parsed.length > 0) {
+          articleCount++;
+          articleSet.add(parsed[0].title);
+        }
+      }
+    }
+    setArticles(Array.from(articleSet));
+    articleCacheRef.current = articleSet;
+    setArticleFetchCount(articleCount);
+    setTotalTokens(0);
+    setSessionModal(false);
+    refreshSessionsList();
+  }
+
+  function handleSessionCreate(name: string) {
+    const id = createSession(name);
+    const session = switchSession(id);
+    setCurrentProvider(session.provider as ProviderName);
+    setCurrentModel(session.model ?? DEFAULT_MODELS[session.provider as ProviderName]);
+    setMessages([{ id: "welcome", query: "", raw: WELCOME_TEXT }]);
+    conversationHistoryRef.current = [];
+    agentRef.current = null;
+    turnIndexRef.current = 0;
+    setQueryCount(0);
+    setArticleFetchCount(0);
+    setArticles([]);
+    articleCacheRef.current = new Set();
+    setTotalTokens(0);
+    refreshSessionsList();
+  }
+
+  function handleSessionRename(id: number, name: string) {
+    renameSession(id, name);
+    refreshSessionsList();
+  }
+
+  function handleSessionDelete(id: number) {
+    const wasCurrent = id === getCurrentSessionId();
+    deleteSession(id);
+    const remaining = listSessions();
+    if (remaining.length === 0) {
+      const newId = createSession("default");
+      const session = switchSession(newId);
+      setCurrentProvider(session.provider as ProviderName);
+      setCurrentModel(session.model ?? DEFAULT_MODELS[session.provider as ProviderName]);
+      setMessages([{ id: "welcome", query: "", raw: WELCOME_TEXT }]);
+      conversationHistoryRef.current = [];
+      agentRef.current = null;
+      turnIndexRef.current = 0;
+      setQueryCount(0);
+      setArticleFetchCount(0);
+      setArticles([]);
+      articleCacheRef.current = new Set();
+      setTotalTokens(0);
+    } else if (wasCurrent) {
+      handleSessionSwitch(remaining[0].id);
+    }
+    refreshSessionsList();
   }
 
   function handleSubmit(value: string) {
@@ -214,6 +343,12 @@ function App({ colors, isDark }: AppProps) {
       const id = crypto.randomUUID();
       setMessages((prev) => [...prev.slice(-(MAX_TURNS - 1)), { id, query: "", raw: `  Switched model to ${modelName}`, help: true }]);
       updateSessionProvider(currentProvider, modelName);
+      return;
+    }
+
+    if (trimmed.startsWith("/sessions")) {
+      setSessionsList(listSessions());
+      setSessionModal(true);
       return;
     }
 
@@ -326,6 +461,8 @@ function App({ colors, isDark }: AppProps) {
       });
   }
 
+  const currentSessionName = sessionsList.find((s) => s.id === getCurrentSessionId())?.name ?? "default";
+
   return (
     <box flexDirection="row" width="100%" height="100%">
       {sidebarVisible && (
@@ -336,6 +473,7 @@ function App({ colors, isDark }: AppProps) {
           articleCount={articleFetchCount}
           articles={articles}
           totalTokens={totalTokens}
+          currentSessionName={currentSessionName}
         />
       )}
       <box flexDirection="column" flexGrow={1} width="100%" height="100%">
@@ -346,7 +484,7 @@ function App({ colors, isDark }: AppProps) {
           currentProvider={currentProvider}
           currentModel={currentModel}
           isProcessing={isProcessing}
-          isFocused={!setupModal.visible}
+          isFocused={!setupModal.visible && !sessionModal}
           onSubmit={handleSubmit}
           inputKey={inputKey}
         />
@@ -363,6 +501,20 @@ function App({ colors, isDark }: AppProps) {
             setSetupModal({ visible: false, provider: null });
           }}
           onClose={() => setSetupModal({ visible: false, provider: null })}
+        />
+      )}
+      {sessionModal && (
+        <SessionModal
+          visible={true}
+          colors={colors}
+          isDark={isDark}
+          currentSessionId={getCurrentSessionId()}
+          sessions={sessionsList}
+          onSwitch={handleSessionSwitch}
+          onCreate={handleSessionCreate}
+          onRename={handleSessionRename}
+          onDelete={handleSessionDelete}
+          onClose={() => setSessionModal(false)}
         />
       )}
     </box>
