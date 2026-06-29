@@ -233,9 +233,9 @@ function App({ colors, isDark }: AppProps) {
 
   function handleSessionCreate(name: string) {
     const id = createSession(name);
-    switchSession(id);
-    setCurrentProvider("openai");
-    setCurrentModel(DEFAULT_MODELS.openai);
+    const session = switchSession(id);
+    setCurrentProvider(session.provider as ProviderName);
+    setCurrentModel(session.model ?? DEFAULT_MODELS[session.provider as ProviderName]);
     setMessages([{ id: "welcome", query: "", raw: WELCOME_TEXT }]);
     conversationHistoryRef.current = [];
     agentRef.current = null;
@@ -258,9 +258,9 @@ function App({ colors, isDark }: AppProps) {
     const remaining = listSessions();
     if (remaining.length === 0) {
       const newId = createSession("default");
-      switchSession(newId);
-      setCurrentProvider("openai");
-      setCurrentModel(DEFAULT_MODELS.openai);
+      const session = switchSession(newId);
+      setCurrentProvider(session.provider as ProviderName);
+      setCurrentModel(session.model ?? DEFAULT_MODELS[session.provider as ProviderName]);
       setMessages([{ id: "welcome", query: "", raw: WELCOME_TEXT }]);
       conversationHistoryRef.current = [];
       agentRef.current = null;
