@@ -168,9 +168,14 @@ function App({ colors, isDark }: AppProps) {
     const session = switchSession(id);
     if (!session) return;
 
-    setCurrentProvider(session.provider as ProviderName);
-    const model = session.model ?? DEFAULT_MODELS[session.provider as ProviderName];
-    setCurrentModel(model);
+    const newProvider = session.provider as ProviderName;
+    const newModel = session.model ?? DEFAULT_MODELS[newProvider];
+    // Avoid recreating agent when provider/model haven't changed
+    if (newProvider !== currentProvider || newModel !== currentModel) {
+      agentRef.current = null;
+    }
+    setCurrentProvider(newProvider);
+    setCurrentModel(newModel);
 
     const rawTurns = getSessionTurns(id);
     const loadedTurns: TurnData[] = rawTurns.map((t: SessionTurn) => ({
@@ -185,8 +190,26 @@ function App({ colors, isDark }: AppProps) {
     }));
     setMessages(loadedTurns.length > 0 ? loadedTurns : [{ id: "welcome", query: "", raw: WELCOME_TEXT }]);
 
-    conversationHistoryRef.current = [];
-    agentRef.current = null;
+    // Reconstruct conversation history from DB so the agent has context on next query
+    const history: { role: string; content: string }[] = [];
+    for (const t of rawTurns) {
+      if (t.error || !t.query) continue;
+      history.push({ role: "user", content: t.query });
+      // Use raw (unparseable) response, or reconstruct JSON from stored summary/quotes/sources
+      if (t.raw) {
+        history.push({ role: "assistant", content: t.raw });
+      } else if (t.summary) {
+        history.push({
+          role: "assistant",
+          content: JSON.stringify({
+            summary: t.summary,
+            quotes: t.quotes ? JSON.parse(t.quotes) : [],
+            sources: t.sources ? JSON.parse(t.sources) : [],
+          }),
+        });
+      }
+    }
+    conversationHistoryRef.current = history;
     turnIndexRef.current = rawTurns.length;
     setQueryCount(rawTurns.filter((t) => t.query).length);
     const articleSet = new Set<string>();
