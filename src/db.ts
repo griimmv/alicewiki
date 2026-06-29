@@ -35,7 +35,13 @@ export function initDB(): void {
   }
 
   createTables();
-  currentSessionId = createSession();
+  const existing = db.query("SELECT COUNT(*) as count FROM sessions").get() as { count: number };
+  if (existing.count === 0) {
+    currentSessionId = createSession("default");
+  } else {
+    const last = db.query("SELECT id FROM sessions ORDER BY id DESC LIMIT 1").get() as { id: number } | null;
+    currentSessionId = last?.id ?? null;
+  }
 }
 
 function createTables(): void {
@@ -79,16 +85,74 @@ function createTables(): void {
   `);
 }
 
-function createSession(): number {
+export interface SessionInfo {
+  id: number;
+  name: string;
+  provider: string;
+  model: string | null;
+  turnCount: number;
+  createdAt: string;
+}
+
+export function createSession(name: string = "default"): number {
   if (!db) throw new Error("DB not initialized");
   const lastSession = getSessionProvider();
   const provider = lastSession?.provider ?? "openai";
   const model = lastSession?.model ?? null;
   const result = db.run(
     "INSERT INTO sessions (name, provider, model, created_at, updated_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))",
-    ["default", provider, model]
+    [name, provider, model]
   );
   return Number(result.lastInsertRowid);
+}
+
+export function listSessions(): SessionInfo[] {
+  if (!db) return [];
+  return db.query(`
+    SELECT s.id, s.name, s.provider, s.model, COUNT(t.id) as turnCount, s.created_at as createdAt
+    FROM sessions s LEFT JOIN turns t ON t.session_id = s.id
+    GROUP BY s.id ORDER BY s.created_at DESC
+  `).all() as SessionInfo[];
+}
+
+export function switchSession(id: number): { provider: string; model: string | null; name: string } | null {
+  if (!db) return null;
+  const session = db.query("SELECT provider, model, name FROM sessions WHERE id = ?").get(id) as any;
+  if (!session) return null;
+  currentSessionId = id;
+  db.run("UPDATE sessions SET updated_at = datetime('now') WHERE id = ?", [id]);
+  return session;
+}
+
+export function renameSession(id: number, name: string): void {
+  if (!db) return;
+  db.run("UPDATE sessions SET name = ?, updated_at = datetime('now') WHERE id = ?", [name, id]);
+}
+
+export function deleteSession(id: number): void {
+  if (!db) return;
+  db.run("DELETE FROM sessions WHERE id = ?", [id]);
+  if (currentSessionId === id) {
+    currentSessionId = null;
+  }
+}
+
+export interface SessionTurn {
+  id: number;
+  query: string;
+  summary: string | null;
+  quotes: string | null;
+  sources: string | null;
+  raw: string | null;
+  error: string | null;
+  help: number;
+}
+
+export function getSessionTurns(sessionId: number): SessionTurn[] {
+  if (!db) return [];
+  return db.query(
+    "SELECT id, query, summary, quotes, sources, raw, error, help FROM turns WHERE session_id = ? ORDER BY turn_index ASC"
+  ).all(sessionId) as SessionTurn[];
 }
 
 export function getCurrentSessionId(): number | null {
