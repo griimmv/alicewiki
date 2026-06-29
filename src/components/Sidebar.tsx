@@ -31,7 +31,7 @@ export function Sidebar({ colors, isDark, queryCount, articleCount, articles, to
       <box height={1} width="100%" />
       <box flexDirection="column" width="100%" flexShrink={0}>
         <text fg={colors.muted}><b> SESSION STATS</b></text>
-        <text fg={colors.text}> Session: {currentSessionName}</text>
+        <text fg={colors.text}> Session: {currentSessionName.length > 16 ? currentSessionName.slice(0, 16) + "\u2026" : currentSessionName}</text>
         <text fg={colors.text}> Queries: {queryCount}</text>
         <text fg={colors.text}> Articles: {articleCount}</text>
         <text fg={colors.text}> Tokens: {totalTokens.toLocaleString()}</text>
