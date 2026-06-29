@@ -254,6 +254,7 @@ function App({ colors, isDark }: AppProps) {
   }
 
   function handleSessionDelete(id: number) {
+    const wasCurrent = id === getCurrentSessionId();
     deleteSession(id);
     const remaining = listSessions();
     if (remaining.length === 0) {
@@ -270,7 +271,7 @@ function App({ colors, isDark }: AppProps) {
       setArticles([]);
       articleCacheRef.current = new Set();
       setTotalTokens(0);
-    } else if (id === getCurrentSessionId()) {
+    } else if (wasCurrent) {
       handleSessionSwitch(remaining[0].id);
     }
     refreshSessionsList();
