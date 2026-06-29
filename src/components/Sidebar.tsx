@@ -7,9 +7,10 @@ interface SidebarProps {
   articleCount: number;
   articles: string[];
   totalTokens: number;
+  currentSessionName: string;
 }
 
-export function Sidebar({ colors, isDark, queryCount, articleCount, articles, totalTokens }: SidebarProps) {
+export function Sidebar({ colors, isDark, queryCount, articleCount, articles, totalTokens, currentSessionName }: SidebarProps) {
   const sidebarBg = isDark ? "#24283b" : "#d5d6db";
 
   return (
@@ -30,6 +31,7 @@ export function Sidebar({ colors, isDark, queryCount, articleCount, articles, to
       <box height={1} width="100%" />
       <box flexDirection="column" width="100%" flexShrink={0}>
         <text fg={colors.muted}><b> SESSION STATS</b></text>
+        <text fg={colors.text}> Session: {currentSessionName}</text>
         <text fg={colors.text}> Queries: {queryCount}</text>
         <text fg={colors.text}> Articles: {articleCount}</text>
         <text fg={colors.text}> Tokens: {totalTokens.toLocaleString()}</text>
