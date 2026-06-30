@@ -10,9 +10,10 @@ let db: Database | null = null;
 let currentSessionId: number | null = null;
 
 export function initDB(dbPath?: string): void {
-  const dbFile = dbPath ?? DB_PATH;
+  const isMemory = dbPath === ":memory:";
+  const dbFile = isMemory ? ":memory:" : DB_PATH;
 
-  if (!dbPath) {
+  if (!isMemory) {
     if (!existsSync(DB_DIR)) {
       mkdirSync(DB_DIR, { recursive: true, mode: 0o700 });
     }
@@ -25,7 +26,7 @@ export function initDB(dbPath?: string): void {
   db.run("PRAGMA journal_mode = WAL");
   db.run("PRAGMA foreign_keys = ON");
 
-  if (!dbPath) {
+  if (!isMemory) {
     try {
       chmodSync(dbFile, 0o600);
       for (const ext of ["-wal", "-shm"]) {
