@@ -1,11 +1,11 @@
-import { expect, test, beforeAll, afterAll } from "bun:test";
+import { expect, test, beforeEach, afterEach } from "bun:test";
 import { initDB, closeDB, getCredential, setCredential, createSession, listSessions, switchSession, renameSession, deleteSession, getSessionTurns, getCurrentSessionId, getSessionProvider, saveTurn, updateSessionProvider } from "../db.ts";
 
-beforeAll(() => {
+beforeEach(() => {
   initDB(":memory:");
 });
 
-afterAll(() => {
+afterEach(() => {
   closeDB();
 });
 
@@ -34,21 +34,26 @@ test("createSession creates a new session", () => {
 });
 
 test("switchSession switches to a different session", () => {
-  const session = switchSession(2);
+  const id = createSession("test-session");
+  const session = switchSession(id);
   expect(session?.name).toBe("test-session");
-  expect(getCurrentSessionId()).toBe(2);
+  expect(getCurrentSessionId()).toBe(id);
 });
 
 test("renameSession renames the session", () => {
-  renameSession(2, "renamed-session");
-  const session = switchSession(2);
+  const id = createSession("to-rename");
+  renameSession(id, "renamed-session");
+  const session = switchSession(id);
   expect(session?.name).toBe("renamed-session");
 });
 
 test("deleteSession removes a session", () => {
-  deleteSession(2);
+  const id = createSession("to-delete");
   const sessions = listSessions();
-  expect(sessions.length).toBe(1);
+  expect(sessions.length).toBe(2);
+  deleteSession(id);
+  const after = listSessions();
+  expect(after.length).toBe(1);
 });
 
 test("setCredential and getCredential work", () => {
@@ -79,27 +84,19 @@ test("saveTurn saves a turn", () => {
 });
 
 test("saveTurn stores multiple turns", () => {
-  saveTurn(1, {
-    query: "second query",
-    turnIndex: 1,
-    inputTokens: 5,
-    outputTokens: 10,
-  });
+  saveTurn(1, { query: "first", turnIndex: 0, inputTokens: 10, outputTokens: 20 });
+  saveTurn(1, { query: "second query", turnIndex: 1, inputTokens: 5, outputTokens: 10 });
   const turns = getSessionTurns(1);
   expect(turns.length).toBe(2);
-  expect(turns[0].query).toBe("what is Python");
+  expect(turns[0].query).toBe("first");
   expect(turns[1].query).toBe("second query");
 });
 
 test("saveTurn with error stores error field", () => {
-  saveTurn(1, {
-    query: "error query",
-    turnIndex: 2,
-    error: "Something went wrong",
-  });
+  saveTurn(1, { query: "error query", turnIndex: 0, error: "Something went wrong" });
   const turns = getSessionTurns(1);
-  const errorTurn = turns.find((t: any) => t.error);
-  expect(errorTurn?.error).toBe("Something went wrong");
+  expect(turns.length).toBe(1);
+  expect(turns[0].error).toBe("Something went wrong");
 });
 
 test("getSessionTurns returns empty array for session with no turns", () => {
