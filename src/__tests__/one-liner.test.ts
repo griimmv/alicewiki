@@ -1,6 +1,7 @@
 import { mock, test, expect, beforeAll, beforeEach, afterEach, describe } from "bun:test";
 
 const mockLogs: string[] = [];
+let originalLog: typeof console.log;
 
 mock.module("../tools/wikipedia.ts", () => ({
   wikipediaTool: {
@@ -32,14 +33,14 @@ beforeAll(async () => {
 
 beforeEach(() => {
   mockLogs.length = 0;
+  originalLog = console.log;
   console.log = (...args: any[]) => {
     mockLogs.push(args.map(String).join(" "));
   };
 });
 
 afterEach(() => {
-  delete (console as any).log;
-  console.log = (...args: any[]) => {};
+  console.log = originalLog;
 });
 
 describe("runOneLiner", () => {
