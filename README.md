@@ -1,5 +1,4 @@
-![AliceWiki Banner](assets/alicewiki5.png)
-# AliceWiki
+<img src="assets/alicewiki5.png" alt="AliceWiki Banner" width="800" />
 
 A terminal AI chatbot that fetches Wikipedia articles through the Wikipedia REST API using LangChain.
 
@@ -14,6 +13,15 @@ A terminal AI chatbot that fetches Wikipedia articles through the Wikipedia REST
 bun install -g alicewiki
 ```
 
+or
+
+```bash
+git clone https://github.com/griimmv/alicewiki.git
+cd alicewiki
+bun install
+bun link
+```
+
 ## Configuration
 
 API keys are set at runtime inside the TUI with `/setKey <provider>` and stored in `~/.alicewiki/alicewiki.db`. Provider and model preferences persist across sessions automatically.
@@ -24,7 +32,7 @@ The security here, how should i say it... a little fragile? It's literally just 
 So thats going to the todo list.
 
 it's literally this
-![cheetos holding down a door](assets/cheetos.jpg)
+<img src="assets/cheetos.jng" alt="cheetos holding down a door" width="250" />
 
 ## Usage
 
