@@ -3,7 +3,6 @@
 .env
 .env.example
 node_modules
-*.ts
-*.map
+src/__tests__/
 tsconfig.json
 assets
