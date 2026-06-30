@@ -129,8 +129,8 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
   - Uses `wiki.page(input, { preload: true })` to fetch page data.
   - Fetches both `page.summary()` and `page.content()` in parallel.
   - Full content truncated at 8000 chars with `[...content truncated]` suffix.
-   - Falls back to fuzzy search (`wiki.search()`) when direct page lookup fails; appends a `notification` field when using a fuzzy match.
-   - Returns `foundArticle: false` with a `notification` if no article is found at all or if the search errors out.
+  - Falls back to fuzzy search (`wiki.search()`) when direct page lookup fails; appends a `notification` field when using a fuzzy match.
+  - Returns `foundArticle: false` with a `notification` if no article is found at all or if the search errors out.
 - Uses the `wikipedia` npm package for API access.
 
 - All Wikipedia API calls (`wiki.page()`, `page.summary()`, `page.content()`, `wiki.search()`) are wrapped with a 15s timeout via `Promise.race`.
