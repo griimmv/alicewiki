@@ -36,6 +36,8 @@ src/
 │   ├── SetupModal.tsx    # Full-screen overlay modal for entering API keys at runtime.
 │   │                       Shows provider info, link to key page, and a MaskedInput field.
 │   │                       Escape to dismiss, Enter to save — persisted via setCredential().
+│   ├── SessionModal.tsx  # Full-screen overlay modal for managing sessions (list, switch,
+│   │                       create, rename, delete). Keyboard-driven with n/r/d/Enter/Esc.
 │   ├── MaskedInput.tsx   # Reusable masked text input showing • characters. Supports paste
 │   │                       via usePaste (decodePasteBytes), backspace, Escape, and Enter.
 │   └── TypewriterText.tsx # Char-by-char text reveal via useState + useEffect interval
@@ -61,25 +63,27 @@ Two modes depending on invocation:
 1. **TUI startup** (`tui.tsx:startTUI`): creates `createCliRenderer`, detects theme, calls `createRoot(renderer).render(<App />)`.
 2. **Layout**: `<box flexDirection="row">` → `[Sidebar | column → [Header | Messages | InputBar]]`.
    - **Sidebar** (`src/components/Sidebar.tsx`, width 30): shows app title, session stats
-  (queries/articles/tokens on separate lines), fetched articles (deduplicated by App state),
+  (session name, queries/articles/tokens on separate lines), fetched articles (deduplicated by App state),
   and keybinding hints. Toggled with `Ctrl+B`.
    - **MainColumn** = `[Header | Messages | InputBar]`:
      - **Header**: ASCII art logo + current provider name.
      - **Messages**: `<scrollbox>`, sticky-scroll to bottom, max 50 turns.
      - **InputBar**: `<input>` with placeholder, plus model status line.
 3. **User input**: on Enter, value sent to `handleSubmit()` in App.
-   - Commands (`/help`, `/switch`, `/model`, `/setKey`, `/quit`) are handled inline with `return`.
+   - Commands (`/help`, `/switch`, `/model`, `/setKey`, `/sessions`, `/quit`) are handled inline with `return`.
    - Responses to `/help`, `/switch`, and `/model` render in a green-bordered `HELP` box.
    - `/setKey <provider>` opens a `SetupModal` overlay for entering an API key via `MaskedInput`.
-4. **Input guard**: while processing, `onSubmit` on the `<input>` is set to `undefined` so Enter does nothing. Press `Escape` during processing to abort the in-flight LLM request instantly via `AbortController`.
+   - `/sessions` opens a `SessionModal` overlay for managing sessions (switch, create, rename, delete).
+4. **Input guard**: while processing, `onSubmit` on the `<input>` is set to `undefined` so Enter does nothing. Press `Escape` during processing to abort the in-flight LLM request instantly via `AbortController`. The input bar is also disabled when a modal (SetupModal or SessionModal) is open.
 5. **Lazy agent init**: the agent (`createAgent(createLLM(...))`) is created on the first query, not at startup — so the TUI starts even without a configured API key.
 6. **LLM tool calling** (`agent.ts`): conversation history + system prompt sent to LLM with the wikipedia tool registered. The LLM decides whether to invoke the tool. Runs up to 2 loops.
-7. **Wikipedia fetch**: when the LLM calls the tool, `wikipediaTool` fetches the page and returns structured JSON (`title`, `extract`, `fullContent`, `url`, `thumbnail`).
+7. **Wikipedia fetch**: when the LLM calls the tool, `wikipediaTool` fetches the page and returns structured JSON (`title`, `extract`, `fullContent`, `url`, `thumbnail`, `foundArticle`).
 8. **LLM synthesis**: the tool result is fed back to the LLM, which produces structured JSON response (`summary`, `quotes`, `sources`). Falls back to raw text if JSON parsing fails.
 9. **Token tracking**: each LLM invocation's `usage_metadata` is accumulated and displayed in the sidebar as `Tokens: N`.
 10. **Output**: rendered inside the TUI as bordered boxes for user query, summary, direct quotes, and sources. Sidebar stats and fetched articles list are updated. A processing spinner animates in the user query box while waiting.
 11. **Persistence**: each turn is saved to SQLite via `saveTurn()` (session ID, query, summary, quotes, sources, tokens, errors). Session is created at startup in `initDB()`.
-12. **Animation & release**: typewriter animation reveals the response char-by-char. `isProcessing` stays `true` until the last animation step completes (last source text, or last quote, or summary if no quotes/sources). Then `handleTurnAnimationComplete()` releases the input guard and hides the warning box. Errors release immediately (no animation).
+12. **Session switching**: switching sessions (via `/sessions` or `handleSessionSwitch()`) loads the previous conversation history from the DB and reconstructs the `conversationHistoryRef` so the LLM retains context across queries within the same session. The agent is recreated if the provider or model differs.
+13. **Animation & release**: typewriter animation reveals the response char-by-char. `isProcessing` stays `true` until the last animation step completes (last source text, or last quote, or summary if no quotes/sources). Then `handleTurnAnimationComplete()` releases the input guard and hides the warning box. Errors release immediately (no animation).
 
 ## Providers
 
@@ -108,6 +112,10 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
 | `Ctrl+click` | Open links |
 | `Escape` | Close setup modal / Cancel in-flight LLM request |
 | `/quit` | Exit the application |
+| (Session modal) `n` | Create new session |
+| (Session modal) `r` | Rename selected session |
+| (Session modal) `d` | Delete selected session |
+| (Session modal) `Enter` | Switch to selected session |
 
 ## Tool Details
 
@@ -115,13 +123,14 @@ Installed as both `alicewiki` and `aw` (see `package.json`).
 
 - **Name**: `wikipedia`
 - **Input**: Object with `query` property (e.g. `{ query: "Python programming language" }`, `{ query: "Mary Sue" }`)
-- **Output**: JSON string with `title`, `url`, `extract`, `fullContent`, `thumbnail`, and optional `notification`
+- **Output**: JSON string with `title`, `url`, `extract`, `fullContent`, `thumbnail`, `foundArticle`, and optional `notification`
 - **Implementation**:
   - Built with `@langchain/core/tools` `tool()` factory and Zod schema.
   - Uses `wiki.page(input, { preload: true })` to fetch page data.
   - Fetches both `page.summary()` and `page.content()` in parallel.
   - Full content truncated at 8000 chars with `[...content truncated]` suffix.
-  - Falls back to fuzzy search (`wiki.search()`) when direct page lookup fails; appends a `notification` field when using a fuzzy match.
+   - Falls back to fuzzy search (`wiki.search()`) when direct page lookup fails; appends a `notification` field when using a fuzzy match.
+   - Returns `foundArticle: false` with a `notification` if no article is found at all or if the search errors out.
 - Uses the `wikipedia` npm package for API access.
 
 - All Wikipedia API calls (`wiki.page()`, `page.summary()`, `page.content()`, `wiki.search()`) are wrapped with a 15s timeout via `Promise.race`.
@@ -134,7 +143,7 @@ Used in one-liner mode. Strips leading keywords (`who is`, `what is`, `tell me a
 
 Agent orchestrator. Sends conversation + system prompt to LLM with the wikipedia tool registered. Supports up to 2 tool-calling loops (reduced from 5 to prevent token waste). Returns `{ content: string; tokens: TokenUsage }` — token usage extracted from `result.usage_metadata` (input/output/total) and accumulated across invocations.
 
-Retries are handled by the LangChain SDK's built-in logic (no custom retry loop). Each LLM invoke has a 30s outer timeout via `Promise.race`; tool calls have a 20s outer timeout. An optional `AbortSignal` can be passed through to allow instant cancellation (used by Escape in the TUI).
+Retries are handled by the LangChain SDK's built-in logic (no custom retry loop). Each LLM invoke has a 30s outer timeout via `Promise.race`; tool calls have a 20s outer timeout. An optional `AbortSignal` can be passed through to allow instant cancellation (used by Escape in the TUI). The `withTimeout` helper uses a 3-way `Promise.race` (promise, timeout, abort signal) to support both timeout and cancellation for tool calls.
 
 ### `createAgent` (`agent.ts:12`)
 
