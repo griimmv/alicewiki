@@ -1,5 +1,4 @@
-![AliceWiki Banner](assets/alicewiki5.png)
-# AliceWiki
+<img src="assets/alicewiki5.png" alt="AliceWiki Banner" width="800" />
 
 A terminal AI chatbot that fetches Wikipedia articles through the Wikipedia REST API using LangChain.
 
@@ -14,9 +13,26 @@ A terminal AI chatbot that fetches Wikipedia articles through the Wikipedia REST
 bun install -g alicewiki
 ```
 
+or
+
+```bash
+git clone https://github.com/griimmv/alicewiki.git
+cd alicewiki
+bun install
+bun link
+```
+
 ## Configuration
 
 API keys are set at runtime inside the TUI with `/setKey <provider>` and stored in `~/.alicewiki/alicewiki.db`. Provider and model preferences persist across sessions automatically.
+
+## Security (important!!)
+
+The security here, how should i say it... a little fragile? It's literally just chmod 700 and 600 for the db and it doesn't work on Windows.
+So thats going to the todo list.
+
+it's literally this
+<img src="assets/cheetos.jng" alt="cheetos holding down a door" width="250" />
 
 ## Usage
 
@@ -34,6 +50,7 @@ aw who is mary sue?
 - `/switch <provider>` - Switch LLM provider (openai, anthropic, google)
 - `/model <name>` - Change model for current provider
 - `/setKey <provider>` - Set API key for a provider at runtime
+- `/sessions` - Open session manager
 - `/quit` - Exit
 
 ## Key Bindings
@@ -43,6 +60,7 @@ aw who is mary sue?
 | `Ctrl+B` | Toggle sidebar visibility |
 | `Alt+D` | Focus the input bar |
 | `Ctrl+C` | Quit the application |
+| `Ctrl+click` | Open links |
 | `Escape` | Close setup modal / Cancel in-flight LLM request |
 
 ## Architecture
@@ -79,6 +97,8 @@ src/
 │   ├── SetupModal.tsx    # Full-screen overlay modal for entering API keys at runtime.
 │   │                       Shows provider info, link to key page, and a MaskedInput field.
 │   │                       Escape to dismiss, Enter to save — persisted via setCredential().
+│   ├── SessionModal.tsx  # Full-screen overlay modal for managing sessions (list, switch,
+│   │                       create, rename, delete). Keyboard-driven with n/r/d/Enter/Esc.
 │   ├── MaskedInput.tsx   # Reusable masked text input showing • characters. Supports paste
 │   │                       via usePaste (decodePasteBytes), backspace, Escape, and Enter.
 │   └── TypewriterText.tsx # Char-by-char text reveal via useState + useEffect interval
