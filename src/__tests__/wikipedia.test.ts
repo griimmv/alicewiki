@@ -113,7 +113,7 @@ describe("wikipediaTool", () => {
     searchTimeout = false;
     const result = JSON.parse(await wikipediaTool.func({ query: "test" }));
     expect(result.foundArticle).toBe(false);
-    expect(result.notification).toContain("Search failed");
+    expect(result.notification).toContain("Wikipedia search failed for");
   });
 
   test("returns timeout notification on search timeout", async () => {
