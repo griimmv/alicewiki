@@ -10,12 +10,6 @@ A terminal AI chatbot that fetches Wikipedia articles through the Wikipedia REST
 ## Installation
 
 ```bash
-bun install -g alicewiki
-```
-
-or
-
-```bash
 git clone https://github.com/griimmv/alicewiki.git
 cd alicewiki
 bun install
