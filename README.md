@@ -32,6 +32,7 @@ The security here, how should i say it... a little fragile? It's literally just 
 So thats going to the todo list.
 
 it's literally this
+<br>
 <img src="assets/cheetos.jpg" alt="cheetos holding down a door" width="250" />
 
 ## Usage
